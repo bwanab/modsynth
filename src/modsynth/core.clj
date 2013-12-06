@@ -88,53 +88,63 @@
      (doseq [cable cables]
        (let [[w1 w2] cable
              [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
-         (println x1 y1 x2 y2)
+         ;(println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
      (.setColor g cur-color)
     ))
 
-;;(let [p1 (config l :location)
-;;                                                p2 (config widget :location)])
+(defn make-io [io]
+  (let [nin (count (:inputs io))
+        nout (count (:outputs io))
+        ncols (max nin nout)
+        items (interleave
+               (concat ["Inputs"]
+                       (for [b (:inputs io)] (button :text b :class :button))
+                       (for [i (range nin ncols)] (label "")))
+               (concat ["Outputs"]
+                       (for [b (:outputs io)] (button :text b :class :button))
+                       (for [i (range nout ncols)] (label ""))))]
+    (println :nin nin :nout nout :ncols ncols)
+    (println items)
+    (grid-panel :rows  (inc ncols)
+                :columns 2
+                :items items
+                )))
 
-(defn do-line [e]
-  (let [x1 1
-        y1 1
-        x2 50
-        y2 50]
-    (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [x1 y1 x2 y2])))
-
-
-(defn add-widget [t]
+(defn add-widget [t io]
   (let [id (str t (swap! next-id inc))
         kw (keyword id)
-        b  (button :id kw
-                   :text "node")
+        bs  (make-io io)
         widget (doto (border-panel
                       :border (line-border :top 15 :color "#AAFFFF")
                       :north (label id)
-                      :center b
+                      :center bs
                       )
                  (config! :bounds :preferred)
-                 movable)]
-    (listen b :action (fn [e]
+                 movable)
+        ]
+    (doseq [b (config bs :items)]
+      (when (= "button" (first (config b :class)))
+        (listen b :action (fn [e]
                         (if-let [l (:last-widget @s-panel)]
                           (do
                             (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [l widget])
                             (swap! s-panel assoc :last-widget nil))
-                          (swap! s-panel assoc :last-widget widget))))
+                          (swap! s-panel assoc :last-widget widget))))))
+
     (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :nodes widget)
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
                           widget))))
 
 (defn osc [e type]
-  (add-widget type))
+  (add-widget type {:inputs ["freq"] :outputs ["sig"]}))
 
 (defn saw-osc [e]
   (osc e "saw"))
 
 (defn square-osc [e]
-  (osc e "square"))
+  (add-widget "square" {:inputs ["freq" "width"] :outputs ["sig"]}))
 
 (defn sin-osc [e]
   (osc e "sin"))
@@ -157,7 +167,6 @@
                                      :items [(action :handler saw-osc :name "Saw Osc")
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
-                                             (action :handler do-line :name "line")
                                              ])])
      :title   "Overtone Modular Synth"
      :content (border-panel
