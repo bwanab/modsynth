@@ -69,6 +69,13 @@
     ; done after the label is fully constructed.
     (config! :bounds :preferred)))
 
+(defn getXY
+  "return int values for x and y for a widget"
+  [w]
+  (let [p (config w :location)]
+    [(int (.getX p)) (int (.getY p))])
+  )
+
 (defn draw-grid [c g]
   (let [w (width c) h (height c)
         cur-color (.getColor g)
@@ -79,19 +86,15 @@
       (.drawLine g 0 y w y))
      (.setColor g (Color/decode "#FFFFaa"))
      (doseq [cable cables]
-       (let [[x1 y1 x2 y2] cable]
+       (let [[w1 w2] cable
+             [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
          (println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
      (.setColor g cur-color)
     ))
 
-(defn add-widget [w]
-  (let [id (:text w)]
-    (println "add widget " id)
-    (swap! s-panel assoc :nodes w)
-    (config! (:panel @s-panel)
-             :items (conj (config (:panel @s-panel) :items)
-                          w))))
+;;(let [p1 (config l :location)
+;;                                                p2 (config widget :location)])
 
 (defn do-line [e]
   (let [x1 1
@@ -100,16 +103,32 @@
         y2 50]
     (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [x1 y1 x2 y2])))
 
-;; (defn make-widget [e label]
-;;   (doto (border-panel
-;;                        :border (line-border :top 15 :color "#AAFFFF")
-;;                        :north (label label)
-;;                        :center (text :text "Hey type some stuff here"))
-;;                    (config! :bounds :preferred)
-;;                    movable))
+
+(defn add-widget [t]
+  (let [id (str t (swap! next-id inc))
+        kw (keyword id)
+        b  (button :id kw
+                   :text "node")
+        widget (doto (border-panel
+                      :border (line-border :top 15 :color "#AAFFFF")
+                      :north (label id)
+                      :center b
+                      )
+                 (config! :bounds :preferred)
+                 movable)]
+    (listen b :action (fn [e]
+                        (if-let [l (:last-widget @s-panel)]
+                          (do
+                            (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [l widget])
+                            (swap! s-panel assoc :last-widget nil))
+                          (swap! s-panel assoc :last-widget widget))))
+    (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :nodes widget)
+    (config! (:panel @s-panel)
+             :items (conj (config (:panel @s-panel) :items)
+                          widget))))
 
 (defn osc [e type]
-  (add-widget ((comp movable make-label) (str type (swap! next-id inc)))))
+  (add-widget type))
 
 (defn saw-osc [e]
   (osc e "saw"))
@@ -155,5 +174,6 @@
 
 (defn -main [& args]
   (let [f (invoke-now (fr))]
+    (swap! s-panel assoc :frame fr)
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
