@@ -13,6 +13,7 @@
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
+(native!)
 (def next-id (atom 0))
 (def s-panel (atom {}))
 
@@ -69,12 +70,38 @@
     ; done after the label is fully constructed.
     (config! :bounds :preferred)))
 
+
+;;(defrecord IONode [w b wa ha])   ;; widget, button, width adjustment, height adjustment
+;; wa and ha aren't known when IONode is created TODO: solve this so we don't compute this over and over
+(defrecord IONode [w b])   ;; widget, button
+
+(defn button-type [b]
+  (keyword (first (config b :class))))
+
+(defn get-io-width-adjustment [b]
+  (if (= :output (button-type b))
+    (int (.getWidth (config b :size)) )
+    0))
+
+(defn get-io-height-adjustment [b]
+  (int (* 1.5 (.getHeight (config b :size)))))
+
 (defn getXY
   "return int values for x and y for a widget"
   [w]
-  (let [p (config w :location)]
-    [(int (.getX p)) (int (.getY p))])
+  (let [widget (:w w)
+        b (:b w)
+        ;; ew (:wa w)
+        ;; eh (:ha w)
+        ew (get-io-width-adjustment b)
+        eh (get-io-height-adjustment b)
+        wp (config widget :location)
+        bp (config b :location)]
+    [(int (+ ew (.getX wp) (.getX bp)))
+     (int (+ eh (.getY wp) (.getY bp)))])
   )
+
+
 
 (defn draw-grid [c g]
   (let [w (width c) h (height c)
@@ -99,13 +126,13 @@
         ncols (max nin nout)
         items (interleave
                (concat ["Inputs"]
-                       (for [b (:inputs io)] (button :text b :class :button))
+                       (for [b (:inputs io)] (button :text b :class :input))
                        (for [i (range nin ncols)] (label "")))
                (concat ["Outputs"]
-                       (for [b (:outputs io)] (button :text b :class :button))
+                       (for [b (:outputs io)] (button :text b :class :output))
                        (for [i (range nout ncols)] (label ""))))]
-    (println :nin nin :nout nout :ncols ncols)
-    (println items)
+    ;(println :nin nin :nout nout :ncols ncols)
+    ;(println items)
     (grid-panel :rows  (inc ncols)
                 :columns 2
                 :items items
@@ -124,13 +151,17 @@
                  movable)
         ]
     (doseq [b (config bs :items)]
-      (when (= "button" (first (config b :class)))
-        (listen b :action (fn [e]
-                        (if-let [l (:last-widget @s-panel)]
-                          (do
-                            (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [l widget])
-                            (swap! s-panel assoc :last-widget nil))
-                          (swap! s-panel assoc :last-widget widget))))))
+      (when (contains? #{:input :output} (button-type b))
+        (let [
+              ;;wa (get-io-width-adjustment b)
+              ;;ha (get-io-height-adjustment b)
+              wnode (IONode. widget b)]
+          (listen b :action (fn [e]
+                              (if-let [lnode (:last-widget @s-panel)]
+                                (do
+                                  (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
+                                  (swap! s-panel assoc :last-widget nil))
+                                (swap! s-panel assoc :last-widget wnode)))))))
 
     (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :nodes widget)
     (config! (:panel @s-panel)
