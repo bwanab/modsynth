@@ -180,6 +180,9 @@
 (defn sin-osc [e]
   (osc e "sin"))
 
+(defn midi-in [e]
+  (add-widget "midi-in" {:outputs ["freq"]}))
+
 (defn make-panel []
   (xyz-panel
     :paint draw-grid
@@ -198,6 +201,7 @@
                                      :items [(action :handler saw-osc :name "Saw Osc")
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
+                                             (action :handler midi-in :name "Midi In")
                                              ])])
      :title   "Overtone Modular Synth"
      :content (border-panel
