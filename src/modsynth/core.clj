@@ -35,41 +35,6 @@
                               (- (.y p) (.y start-point))])))))
   w)
 
-(defn make-line
-  [x1 y1 x2 y2]
-  (doto
-      (label
-       :border 5
-       :text "dork"
-       :location [(rand-int 300) (rand-int 300)]
-       :paint {
-               :before (fn [c g]
-                         (draw g (line 1 1 (width c) (height c))
-                               (style :foreground "#FFFFaa"
-                                      :backgroun "#aaFFFF"
-                                      :stroke 2)))})
-    (config! :bounds :preferred)))
-
-(defn make-label
-  [text]
-  (doto
-    ; Instead of a boring label, make the label rounded with
-    ; some custom drawing. Use the before paint hook to draw
-    ; under the label's text.
-    (label
-      :border   5
-      :text     text
-      :location [(rand-int 300) (rand-int 300)]
-      :paint {
-        :before (fn [c g]
-                  (draw g (rounded-rect 3 3 (- (width c) 6) (- (height c) 6) 9)
-                          (style :foreground "#FFFFaa"
-                                  :background "#aaFFFF"
-                                  :stroke 2)))})
-    ; Set the bounds to its preferred size. Note that this has to be
-    ; done after the label is fully constructed.
-    (config! :bounds :preferred)))
-
 
 ;;(defrecord IONode [w b wa ha])   ;; widget, button, width adjustment, height adjustment
 ;; wa and ha aren't known when IONode is created TODO: solve this so we don't compute this over and over
@@ -78,13 +43,13 @@
 (defn button-type [b]
   (keyword (first (config b :class))))
 
-(defn get-io-width-adjustment [b]
-  (if (= :output (button-type b))
-    (int (.getWidth (config b :size)) )
+(defn get-io-width-adjustment [w]
+  (if (= :output (button-type (:b w)))
+    (int (.getWidth (:w w)) )
     0))
 
 (defn get-io-height-adjustment [b]
-  (int (* 1.5 (.getHeight (config b :size)))))
+  (int (* 1 (.getHeight (config b :size)))))
 
 (defn getXY
   "return int values for x and y for a widget"
@@ -93,15 +58,13 @@
         b (:b w)
         ;; ew (:wa w)
         ;; eh (:ha w)
-        ew (get-io-width-adjustment b)
+        ew (get-io-width-adjustment w)
         eh (get-io-height-adjustment b)
         wp (config widget :location)
         bp (config b :location)]
     [(int (+ ew (.getX wp) (.getX bp)))
      (int (+ eh (.getY wp) (.getY bp)))])
   )
-
-
 
 (defn draw-grid [c g]
   (let [w (width c) h (height c)
@@ -120,68 +83,57 @@
      (.setColor g cur-color)
     ))
 
-(defn make-io [io]
-  (let [nin (count (:inputs io))
-        nout (count (:outputs io))
-        ncols (max nin nout)
-        items (interleave
-               (concat ["Inputs"]
-                       (for [b (:inputs io)] (button :text b :class :input))
-                       (for [i (range nin ncols)] (label "")))
-               (concat ["Outputs"]
-                       (for [b (:outputs io)] (button :text b :class :output))
-                       (for [i (range nout ncols)] (label ""))))]
-    ;(println :nin nin :nout nout :ncols ncols)
-    ;(println items)
-    (grid-panel :rows  (inc ncols)
-                :columns 2
-                :items items
-                )))
+(defn make-io [io t]
+  (let [v (get io t)]
+    (for [b v] (button :text b :class t))))
 
 (defn add-widget [t io]
   (let [id (str t (swap! next-id inc))
         kw (keyword id)
-        bs  (make-io io)
+        ins  (make-io io :input)
+        outs  (make-io io :output)
         widget (doto (border-panel
-                      :border (line-border :top 15 :color "#AAFFFF")
-                      :north (label id)
-                      :center bs
+                      :border (line-border :top 1 :color "#AAFFFF")
+                      :north (label :text id :background "#AAFFFF" :h-text-position :center)
+                      :center (label "")
+                      :east (grid-panel :rows (count outs) :columns 1 :items outs)
+                      :west (grid-panel :rows (count ins) :columns 1 :items ins)
                       )
                  (config! :bounds :preferred)
                  movable)
         ]
-    (doseq [b (config bs :items)]
-      (when (contains? #{:input :output} (button-type b))
-        (let [
-              ;;wa (get-io-width-adjustment b)
-              ;;ha (get-io-height-adjustment b)
-              wnode (IONode. widget b)]
-          (listen b :action (fn [e]
-                              (if-let [lnode (:last-widget @s-panel)]
-                                (do
-                                  (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
-                                  (swap! s-panel assoc :last-widget nil))
-                                (swap! s-panel assoc :last-widget wnode)))))))
-
+    (doseq [b (concat ins outs)]
+      (let [
+            ;;wa (get-io-width-adjustment b)
+            ;;ha (get-io-height-adjustment b)
+            wnode (IONode. widget b)]
+        (listen b :action
+                (fn [e]
+                  (if-let [lnode (:last-widget @s-panel)]
+                    (when (not= (:w lnode) (:w wnode)) ; don't connect inputs to outputs of same widget
+                      (do
+                        (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
+                        (swap! s-panel assoc :last-widget nil)))
+                    (swap! s-panel assoc :last-widget wnode))))))
     (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :nodes widget)
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
                           widget))))
 
 (defn osc [e type]
-  (add-widget type {:inputs ["freq"] :outputs ["sig"]}))
+  (add-widget type {:input ["freq"] :output ["sig"]}))
 
 (defn saw-osc [e]
   (osc e "saw"))
 
 (defn square-osc [e]
-  (add-widget "square" {:inputs ["freq" "width"] :outputs ["sig"]}))
+  (add-widget "square" {:input ["freq" "width"] :output ["sig"]}))
 
 (defn sin-osc [e]
   (osc e "sin"))
 
 (defn midi-in [e]
-  (add-widget "midi-in" {:outputs ["freq"]}))
+  (add-widget "midi-in" {:output ["freq"]}))
 
 (defn make-panel []
   (xyz-panel
