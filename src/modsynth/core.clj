@@ -10,6 +10,7 @@
 
 (ns modsynth.core
   (:use [seesaw core border behave graphics])
+  (:require [overtone.live :as o])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
@@ -87,7 +88,7 @@
   (let [v (get io t)]
     (for [b v] (button :text b :class t))))
 
-(defn add-widget [t io]
+(defn add-widget [t io cent]
   (let [id (str t (swap! next-id inc))
         kw (keyword id)
         ins  (make-io io :input)
@@ -95,7 +96,7 @@
         widget (doto (border-panel
                       :border (line-border :top 1 :color "#AAFFFF")
                       :north (label :text id :background "#AAFFFF" :h-text-position :center)
-                      :center (label "")
+                      :center cent
                       :east (grid-panel :rows (count outs) :columns 1 :items outs)
                       :west (grid-panel :rows (count ins) :columns 1 :items ins)
                       )
@@ -121,19 +122,38 @@
                           widget))))
 
 (defn osc [e type]
-  (add-widget type {:input ["freq"] :output ["sig"]}))
+  (add-widget type {:input ["freq"] :output ["sig"]} (label type)))
 
 (defn saw-osc [e]
   (osc e "saw"))
 
 (defn square-osc [e]
-  (add-widget "square" {:input ["freq" "width"] :output ["sig"]}))
+  (add-widget "square"
+              {:input ["freq" "width"] :output ["sig"]}
+              (label "sq")))
 
 (defn sin-osc [e]
   (osc e "sin"))
 
+
+(defmacro mod-defsynth [name p body] (let [sym-name (symbol (eval name))] `(o/defsynth ~sym-name ~p ~body)))
+(defmacro mod-ctl [name t val] (let [sym-name (symbol (eval name))] `(o/ctl ~sym-name ~t ~val)))
+
+
 (defn midi-in [e]
-  (add-widget "midi-in" {:output ["freq"]}))
+  (let [id @next-id]
+    (mod-defsynth (str "midi-in" 1)
+                  [obus 0
+                   note {:default 60 :min 0 :max 120 :step 1}]
+                  (let [freq (o/midicps note)]
+                    (o/out:kr obus freq)))
+    (add-widget "midi-in"
+                {:output ["freq"]}
+                (text :text ""
+                      :listen [:key-pressed (fn [e]
+                                              (println (.getKeyCode e))
+                                              (mod-ctl (str "midi-in" 1) :note (.getKeyCode e))
+                                              )]))))
 
 (defn make-panel []
   (xyz-panel
