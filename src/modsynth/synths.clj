@@ -20,7 +20,13 @@
   [obus 0
    ibus 1]
   (let [sig (in:ar ibus 2)]
-    (out obus (lbf sig 1000))))
+    (out obus (lpf sig 1000))))
+
+(defsynth amp
+  [obus 0
+   ibus 1]
+  (let [sig (in:ar ibus 2)]
+    (out obus (* 0.3 sig))))
 
 (defn cbus [] (control-bus 2))
 

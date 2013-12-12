@@ -40,7 +40,7 @@
 
 ;;(defrecord IONode [w b wa ha])   ;; widget, button, width adjustment, height adjustment
 ;; wa and ha aren't known when IONode is created TODO: solve this so we don't compute this over and over
-(defrecord IONode [w b])   ;; widget, button
+(defrecord IONode [w b ot])   ;; widget, button, output-type (:control, :audio)
 
 (defn button-type [b]
   (keyword (first (config b :class))))
@@ -89,18 +89,20 @@
   (let [v (get io t)]
     (for [b v] (button :text b :class t))))
 
-(defn connect-nodes [lnode wnode t]
-  (let [[n1 n2] (if (= (:type lnode) :output)
-                  [(:node lnode) (:node wnode)]
-                  [(:node wnode) (:node lnode)])]
-    (println n1 n2 t)
-    (s/connect-nodes n1 n2 t)))
+(defn connect-nodes [lnode wnode]
+  (let [[n1 n2 out-type]
+        (if (= (:type lnode) :output)
+          [(:node lnode) (:node wnode) (:otype lnode)]
+          [(:node wnode) (:node lnode) (:otype lnode)])]
+    (println n1 n2 out-type)
+    (s/connect-nodes n1 n2 out-type)))
 
 (defn add-widget [t io cent]
   (let [id t
         kw (keyword id)
         ins  (make-io io :input)
         outs  (make-io io :output)
+        out-type (:otype io)
         widget (doto (border-panel :id id
                       :border (line-border :top 1 :color "#AAFFFF")
                       :north (label :text id :background "#AAFFFF" :h-text-position :center)
@@ -115,16 +117,15 @@
       (let [
             ;;wa (get-io-width-adjustment b)
             ;;ha (get-io-height-adjustment b)
-            wnode (IONode. widget b)]
+            wnode (IONode. widget b out-type)]
         (listen b :action
                 (fn [e]
                   (if-let [lnode (:last-widget @s-panel)]
                     (when (not= (:w lnode) (:w wnode)) ; don't connect inputs to outputs of same widget
                       (do
                         ; TODO: not taking into account the button yet. Just assuming that every widget has 1 in 1 out
-                        (connect-nodes {:node (get @synths (name (config (:w lnode) :id))) :type (button-type (:b lnode))}
-                                       {:node (get @synths (name (config (:w wnode) :id))) :type (button-type (:b wnode))}
-                                       :control)
+                        (connect-nodes {:node (get @synths (name (config (:w lnode) :id))) :type (button-type (:b lnode)) :otype (:ot lnode)}
+                                       {:node (get @synths (name (config (:w wnode) :id))) :type (button-type (:b wnode)) :otype (:ot wnode)})
                         (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
                         (swap! s-panel assoc :last-widget nil)))
                     (swap! s-panel assoc :last-widget wnode))))))
@@ -137,7 +138,7 @@
   (str t (swap! next-id inc)))
 
 (defn- osc [e type]
-  (add-widget type {:input ["freq"] :output ["sig"]} (label type)))
+  (add-widget type {:input ["freq"] :output ["sig"] :otype :audio} (label type)))
 
 (defn saw-osc [e]
   (let [id (get-id "saw-osc")]
@@ -146,18 +147,27 @@
 
 (defn square-osc [e]
   (add-widget (get-id "square-osc")
-              {:input ["freq" "width"] :output ["sig"]}
+              {:input ["freq" "width"] :output ["sig"] :otype :audio}
               (label "sq")))
 
 (defn sin-osc [e]
   (osc e (get-id "sin-osc")))
 
+(defn lp-filt [e]
+  (let [id (get-id "lp-filt")]
+    (swap! synths assoc id (s/lp-filt))
+    (add-widget id {:input ["in"] :output ["out"] :otype :audio} (label "lpf"))))
+
+(defn amp [e]
+  (let [id (get-id "amp")]
+    (swap! synths assoc id (s/amp))
+    (add-widget id {:input ["in"] :output ["out"] :otype :audio} (label "amp"))))
 
 (defn midi-in [e]
   (let [id (get-id "midi-in")]
     (swap! synths assoc id (s/midi-in))
     (add-widget id
-                {:output ["freq"]}
+                {:output ["freq"] :otype :control}
                 (text :text ""
                       :listen [:key-pressed (fn [e]
                                               (println (.getKeyCode e))
@@ -183,6 +193,8 @@
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
                                              (action :handler midi-in :name "Midi In")
+                                             (action :handler lp-filt :name "LP Filt")
+                                             (action :handler amp :name "Amp")
                                              ])])
      :title   "Overtone Modular Synth"
      :content (border-panel
