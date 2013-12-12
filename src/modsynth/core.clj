@@ -10,13 +10,14 @@
 
 (ns modsynth.core
   (:use [seesaw core border behave graphics])
-  (:require [overtone.live :as o])
+  (:require [modsynth.synths :as s])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
 (native!)
 (def next-id (atom 0))
 (def s-panel (atom {}))
+(def synths (atom {}))
 
 ; Put in some basic support for moving w around using behave/when-mouse-dragged.
 (defn movable [w]
@@ -88,12 +89,19 @@
   (let [v (get io t)]
     (for [b v] (button :text b :class t))))
 
+(defn connect-nodes [lnode wnode t]
+  (let [[n1 n2] (if (= (:type lnode) :output)
+                  [(:node lnode) (:node wnode)]
+                  [(:node wnode) (:node lnode)])]
+    (println n1 n2 t)
+    (s/connect-nodes n1 n2 t)))
+
 (defn add-widget [t io cent]
-  (let [id (str t (swap! next-id inc))
+  (let [id t
         kw (keyword id)
         ins  (make-io io :input)
         outs  (make-io io :output)
-        widget (doto (border-panel
+        widget (doto (border-panel :id id
                       :border (line-border :top 1 :color "#AAFFFF")
                       :north (label :text id :background "#AAFFFF" :h-text-position :center)
                       :center cent
@@ -113,6 +121,10 @@
                   (if-let [lnode (:last-widget @s-panel)]
                     (when (not= (:w lnode) (:w wnode)) ; don't connect inputs to outputs of same widget
                       (do
+                        ; TODO: not taking into account the button yet. Just assuming that every widget has 1 in 1 out
+                        (connect-nodes {:node (get @synths (name (config (:w lnode) :id))) :type (button-type (:b lnode))}
+                                       {:node (get @synths (name (config (:w wnode) :id))) :type (button-type (:b wnode))}
+                                       :control)
                         (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
                         (swap! s-panel assoc :last-widget nil)))
                     (swap! s-panel assoc :last-widget wnode))))))
@@ -121,38 +133,35 @@
              :items (conj (config (:panel @s-panel) :items)
                           widget))))
 
-(defn osc [e type]
+(defn get-id [t]
+  (str t (swap! next-id inc)))
+
+(defn- osc [e type]
   (add-widget type {:input ["freq"] :output ["sig"]} (label type)))
 
 (defn saw-osc [e]
-  (osc e "saw"))
+  (let [id (get-id "saw-osc")]
+    (swap! synths assoc id (s/saw-osc))
+    (osc e id)))
 
 (defn square-osc [e]
-  (add-widget "square"
+  (add-widget (get-id "square-osc")
               {:input ["freq" "width"] :output ["sig"]}
               (label "sq")))
 
 (defn sin-osc [e]
-  (osc e "sin"))
-
-
-(defmacro mod-defsynth [name p body] (let [sym-name (symbol (eval name))] `(o/defsynth ~sym-name ~p ~body)))
-(defmacro mod-ctl [name t val] (let [sym-name (symbol (eval name))] `(o/ctl ~sym-name ~t ~val)))
+  (osc e (get-id "sin-osc")))
 
 
 (defn midi-in [e]
-  (let [id @next-id]
-    (mod-defsynth (str "midi-in" 1)
-                  [obus 0
-                   note {:default 60 :min 0 :max 120 :step 1}]
-                  (let [freq (o/midicps note)]
-                    (o/out:kr obus freq)))
-    (add-widget "midi-in"
+  (let [id (get-id "midi-in")]
+    (swap! synths assoc id (s/midi-in))
+    (add-widget id
                 {:output ["freq"]}
                 (text :text ""
                       :listen [:key-pressed (fn [e]
                                               (println (.getKeyCode e))
-                                              (mod-ctl (str "midi-in" 1) :note (.getKeyCode e))
+                                              (s/sctl (get @synths id) :note (.getKeyCode e))
                                               )]))))
 
 (defn make-panel []
