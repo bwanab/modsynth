@@ -9,7 +9,8 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns modsynth.core
-  (:use [seesaw core border behave graphics])
+  (:use [seesaw core border behave graphics]
+        [modsynth.piano])
   (:require [modsynth.synths :as s])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
@@ -174,6 +175,14 @@
                                               (s/sctl (get @synths id) :note (.getKeyCode e))
                                               )]))))
 
+(defn piano-in [e]
+  (let [id (get-id "piano-in")]
+    (swap! synths assoc id (s/midi-in))
+    (add-widget id
+                {:output ["freq"] :otype :control}
+                (-> (make-piano)
+                    add-behaviors))))
+
 (defn make-panel []
   (xyz-panel
     :paint draw-grid
@@ -193,6 +202,7 @@
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
                                              (action :handler midi-in :name "Midi In")
+                                             (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
                                              (action :handler amp :name "Amp")
                                              ])])
