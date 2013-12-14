@@ -62,22 +62,26 @@
     :listen [:component-resized layout-piano-keys]
     :bounds [0 0 700 80]))
 
-(defn add-behaviors [root]
+(defn add-behaviors [root on_f off_f ]
   (doseq [k (select root [:.piano-key])]
     (listen k
       :mouse-pressed (fn [e]
                        (let [{:keys [note midi]} (user-data e)]
-                         (println "You hit " note "/" midi)))))
+                         (on_f midi)))
+      :mouse-released (fn [e]
+                        (let [{:keys [note midi]} (user-data e)]
+                         (off_f midi)))))
   root)
 
-(defn piano []
-  (-> (frame
+(defn piano [on_f off_f]
+  (let [p (frame
         :title   "Seesaw piano example"
         :content (border-panel
-                   :vgap 5
-                   :north "Make a piano out of widgets - clicks go to console"
-                   :center (make-piano))
-        :size    [900 :by 100])
-    add-behaviors))
+                  :vgap 5
+                  :north "Make a piano out of widgets - clicks go to console"
+                  :center (make-piano))
+        :size    [900 :by 100])]
+    (add-behaviors p on_f off_f)
+    p))
 
 ;(run :dispose)

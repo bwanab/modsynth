@@ -176,12 +176,15 @@
                                               )]))))
 
 (defn piano-in [e]
-  (let [id (get-id "piano-in")]
-    (swap! synths assoc id (s/midi-in))
+  (let [id (get-id "piano-in")
+        synth (s/midi-in)
+        p (piano (fn [k] (s/sctl synth :note k))
+                 (fn [k] (s/sctl synth :note -1000)))]
+    (swap! synths assoc id synth)
+    (show! p)
     (add-widget id
                 {:output ["freq"] :otype :control}
-                (-> (make-piano)
-                    add-behaviors))))
+                (label ""))))
 
 (defn make-panel []
   (xyz-panel
