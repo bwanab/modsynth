@@ -35,9 +35,9 @@
 (defsynth square-osc
   [obus 0
    ibus 1
-   width {:default 0.5 :min 0.1 :max 0.5 :step 0.1}]
+   width {:default 50 :min 5 :max 50 :step 1}]
   (let [freq (in:kr ibus 2)]
-    (out obus (pulse freq width))))
+    (out obus (pulse freq (/ width 100.0)))))
 
 (defsynth lp-filt
   [cutoff {:default 1000 :min 0 :max 4000 :step 1}
@@ -49,9 +49,9 @@
 (defsynth amp
   [obus 0
    ibus 1
-   gain  {:default 0.3 :min 0 :max 1 :step :0.1}]
+   gain  {:default 30 :min 0 :max 100 :step :1}]
   (let [sig (in:ar ibus 2)]
-    (out obus (* gain sig))))
+    (out obus (* (/ gain 100.0) sig))))
 
 (defn cbus [] (control-bus 2))
 

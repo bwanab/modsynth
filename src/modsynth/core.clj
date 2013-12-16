@@ -113,7 +113,7 @@
         df (:default p)]
     (println p)
     (config! w :min mn :max mx :value df :paint-labels? true :paint-ticks? true)
-    (listen w :change (fn [e] (s/sctl synth t (int (value w)))))))
+    (listen w :change (fn [e] (s/sctl synth t (value w))))))
 
 (defn add-widget [t io cent]
   (let [id t
