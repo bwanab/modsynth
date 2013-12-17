@@ -88,9 +88,9 @@
      (.setColor g cur-color)
     ))
 
-(defn make-io [io t]
+(defn make-io [io t widget-id]
   (let [v (get io t)]
-    (for [b v] (button :text b :class t))))
+    (for [b v] (button :text b :class t :id (str widget-id b)))))
 
 (defn connect-nodes [lnode wnode]
   (let [[n1 n2 out-type]
@@ -114,11 +114,10 @@
     (config! w :min mn :max mx :value df :paint-labels? true :paint-ticks? true)
     (listen w :change (fn [e] (s/sctl synth t (value w))))))
 
-(defn add-widget [t io cent]
-  (let [id t
-        kw (keyword id)
-        ins  (make-io io :input)
-        outs  (make-io io :output)
+(defn add-widget [id io cent]
+  (let [kw (keyword id)
+        ins  (make-io io :input id)
+        outs  (make-io io :output id)
         out-type (:otype io)
         stype (:stype io)
         widget (doto (border-panel :id id
@@ -154,7 +153,8 @@
     (swap! nodes conj widget)
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
-                          widget))))
+                          widget))
+    widget))
 
 (defn get-id [t]
   (str t (swap! next-id inc)))
@@ -298,3 +298,31 @@
     (swap! s-panel assoc :frame fr)
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
+
+;;
+;;(def f (-main))              ; create frame
+;;(def m (midi-in 1))          ; add a midi-in
+;;(def o (saw-osc 1))          ; add a saw-osc
+;;(move! m :by [50 50])        ; move them on the frame
+;;(move! o :by [100 100])
+;;(def b1 (select f [:#midi-in1freq]))  ; get the two buttons we want to connect
+;;(def b2 (select f [:#saw-osc2freq]))
+;;(connect-nodes {:node (get @synths (name (id-of m))) :type (button-type b1) :otype :control}  ;connect the synths
+;;               {:node (get @synths (name (id-of o))) :type (button-type b2) :otype :audio})
+;;(def mnode (modsynth.core.IONode. m b1 :control s/midi-in)) ; make IONode for midi-in/freq
+;;(def onode (modsynth.core.IONode. o b2 :freq s/saw-osc))    ; make IONode for saw-osc/freq
+;;(swap! connections conj [mnode onode]                       ; put them in connections which causes connection to draw
+
+(defn test []
+  (let [f (-main)
+        m (midi-in 1)
+        o (saw-osc 1)
+        b1 (select f [:#midi-in1freq])
+        b2 (select f [:#saw-osc2freq])
+        mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+        onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+    (move! m :by [50 50])
+    (move! o :by [100 100])
+    (connect-nodes {:node (get @synths (name (id-of m))) :type (button-type b1) :otype :control}  ;connect the synths
+                   {:node (get @synths (name (id-of o))) :type (button-type b2) :otype :audio})
+    (swap! connections conj [mnode onode])))
