@@ -46,12 +46,56 @@
   (let [sig (in:ar ibus 2)]
     (out obus (lpf sig cutoff))))
 
+(defsynth hp-filt
+  [cutoff {:default 30 :min 0 :max 300 :step 1}
+   obus 0
+   ibus 1]
+  (let [sig (in:ar ibus 2)]
+    (out obus (hpf sig cutoff))))
+
+(defsynth bp-filt
+  [freq {:default 100 :min 100 :max 4000 :step 1}
+   q {:default 1 :min 1 :max 4 :step 1}
+   obus 0
+   ibus 1]
+  (let [sig (in:ar ibus 2)]
+    (out obus (bpf sig freq q))))
+
+(defsynth moog-filt
+  [cutoff {:default 1000 :min 0 :max 4000 :step 1}
+   lpf-res {:default 10 :min 0 :max 100 :step 1}
+   obus 0
+   ibus 1]
+  (let [sig (in:ar ibus 2)]
+    (out obus (moog-ff sig cutoff (/ lpf-res 100.0)))))
+
 (defsynth amp
   [obus 0
    ibus 1
    gain  {:default 30 :min 0 :max 100 :step :1}]
   (let [sig (in:ar ibus 2)]
     (out obus (* (/ gain 100.0) sig))))
+
+(defsynth freeverb
+  [obus 0
+   ibus 1
+   wet-dry      {:default 40 :min 0 :max 100 :step 1}
+   room-size    {:default 40 :min 0 :max 100 :step 1}
+   dampening    {:default 40 :min 0 :max 100 :step 1}
+   ]
+  (let [sig (in:ar ibus 2)]
+    (out obus (free-verb sig (/ wet-dry 100.0) (/ room-size 100.0) (/ dampening 100) ))))
+
+(defsynth echo
+  [obus 0
+   ibus 1
+   max-delay {:default 100 :min 0 :max 500 :step 1}
+   delay-time {:default 40 :min 0 :max 100 :step 1}
+   decay-time {:default 20 :min 0 :max 100 :step 1}]
+  (let [sig (in:ar ibus 2)
+        echo (comb-n sig (/ max-delay 100.0) (/ delay-time 100.0) (/ decay-time 100.0))]
+    (out obus (+ echo sig))))
+
 
 (defn cbus [] (control-bus 2))
 

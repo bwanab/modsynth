@@ -185,6 +185,31 @@
     (swap! synths assoc id (s/lp-filt))
     (add-widget id {:input ["in" "cutoff"] :output ["out"] :otype :audio :stype s/lp-filt} (label "lpf"))))
 
+(defn hp-filt [e]
+  (let [id (get-id "hp-filt")]
+    (swap! synths assoc id (s/hp-filt))
+    (add-widget id {:input ["in" "cutoff"] :output ["out"] :otype :audio :stype s/hp-filt} (label "hpf"))))
+
+(defn bp-filt [e]
+  (let [id (get-id "bp-filt")]
+    (swap! synths assoc id (s/bp-filt))
+    (add-widget id {:input ["in" "freq" "q"] :output ["out"] :otype :audio :stype s/bp-filt} (label "bpf"))))
+
+(defn moog-filt [e]
+  (let [id (get-id "moog-filt")]
+    (swap! synths assoc id (s/moog-filt))
+    (add-widget id {:input ["in" "cutoff" "lpf-res"] :output ["out"] :otype :audio :stype s/moog-filt} (label "moogf"))))
+
+(defn freeverb [e]
+  (let [id (get-id "freeverb")]
+    (swap! synths assoc id (s/freeverb))
+    (add-widget id {:input ["in" "wet-dry" "room-size" "dampening"] :output ["out"] :otype :audio :stype s/freeverb} (label "freeverb"))))
+
+(defn echo [e]
+  (let [id (get-id "echo")]
+    (swap! synths assoc id (s/echo))
+    (add-widget id {:input ["in" "max-delay" "delay-time" "decay-time"] :output ["out"] :otype :audio :stype s/echo} (label "echo"))))
+
 (defn amp [e]
   (let [id (get-id "amp")]
     (swap! synths assoc id (s/amp))
@@ -249,6 +274,10 @@
                                              (action :handler midi-in :name "Midi In")
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
+                                             (action :handler hp-filt :name "LP Filt")
+                                             (action :handler moog-filt :name "Moog Filt")
+                                             (action :handler freeverb :name "Freeverb")
+                                             (action :handler echo :name "Echo")
                                              (action :handler amp :name "Amp")
                                              (action :handler slider-ctl :name "Slider")
                                              ])])
