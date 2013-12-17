@@ -16,10 +16,11 @@
            [java.awt Color]))
 
 (native!)
-(def next-id (atom 0))
 (def s-panel (atom {}))
+(def next-id (atom 0))
+(def nodes (atom []))
+(def connections (atom []))
 (def synths (atom {}))
-(def master-vol (atom 0.3))
 
 (s/svolume 0.0)
 
@@ -74,16 +75,14 @@
 
 (defn draw-grid [c g]
   (let [w (width c) h (height c)
-        cur-color (.getColor g)
-        cables (:cables @s-panel)]
+        cur-color (.getColor g)]
     (doseq [x (range 0 w 10)]
       (.drawLine g x 0 x h))
     (doseq [y (range 0 h 10)]
       (.drawLine g 0 y w y))
      (.setColor g (Color/decode "#FFFFaa"))
-     (doseq [cable cables]
-       (let [[w1 w2] cable
-             [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
+     (doseq [[w1 w2] @connections]
+       (let [[x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
          ;(println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
      (.setColor g cur-color)
@@ -139,7 +138,7 @@
             wnode (IONode. widget b out-type stype)]
         (listen b :action
                 (fn [e]
-                  (if-let [lnode (:last-widget @s-panel)]
+                  (if-let [lnode (:last-node @s-panel)]
                     (when (not= (:w lnode) (:w wnode)) ; don't connect inputs to outputs of same widget
                       (let [lsynth (get @synths (name (config (:w lnode) :id)))
                             wsynth (get @synths (name (config (:w wnode) :id)))]
@@ -149,10 +148,10 @@
                               :else
                               (connect-nodes {:node lsynth :type (button-type (:b lnode)) :otype (:ot lnode)}
                                              {:node wsynth :type (button-type (:b wnode)) :otype (:ot wnode)}))
-                        (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :cables [lnode wnode])
-                        (swap! s-panel assoc :last-widget nil)))
-                    (swap! s-panel assoc :last-widget wnode))))))
-    (swap! s-panel (fn [m k v] (assoc m k (cons v (get m k)))) :nodes widget)
+                        (swap! connections conj [lnode wnode])
+                        (swap! s-panel assoc :last-node  nil)))
+                    (swap! s-panel assoc :last-node wnode))))))
+    (swap! nodes conj widget)
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
                           widget))))
@@ -246,7 +245,7 @@
                 s)))
 
 (defn sound-on [e]
-  (s/svolume @master-vol))
+  (s/svolume (:master-vol @s-panel)))
 (defn sound-off [e]
   (s/svolume 0.0))
 
@@ -261,7 +260,7 @@
 
 (defn fr []
   (let [p (make-panel)]
-    (swap! s-panel assoc :panel p :cables [])
+    (swap! s-panel assoc :panel p :last-node nil :master-vol 0.3)
     (frame
      :menubar (menubar :items [(menu :text "File"
                                      :items [(action :handler sound-on :name "Sound On")
