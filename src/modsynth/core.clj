@@ -296,7 +296,7 @@
 
 (defn -main [& args]
   (let [f (invoke-now (fr))]
-    (swap! s-panel assoc :frame fr)
+    (swap! s-panel assoc :frame f)
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
 
@@ -323,28 +323,42 @@
 (defn dump-all []
   {:nodes (dump-nodes) :connections (dump-connections) :master-vol (:master-vol @s-panel)})
 
-;; (defmacro make-node [ntype x y]
-;;   (let [node (symbol ntype)]
-;;     `(-> (~node 1)
-;;          (move! :by [~x ~y]))))
-
 (defn make-node [ntype x y]
   (let [s (str "(" ntype " 1)")
         m (load-string s)]
     (move! m :by [x y])))
 
+(defn get-widget-name [node-name]
+  (let [s (str/split node-name #":")
+        n (str/split (second s) #"-")]
+    (str (first s) ":" (first n))))
+
 (defn restore [n]
   (reset! connections [])
   (reset! nodes [])
-  (let [f (-main)]
-    (doseq [n (:nodes n)]
-      (let [s (first (str/split (name (:w n)) #":"))
-            x (:x n)
-            y (:y n)]
-        (println s x y)
-        (make-node s x y)))))
-
-
+  (reset! next-id 0)
+  (let [f (-main)
+        m (apply hash-map
+                 (flatten
+                  (for [n (:nodes n)]
+                    (let [s (first (str/split (name (:w n)) #":"))
+                          x (:x n)
+                          y (:y n)]
+                      [(:w n) (make-node s x y)]))))]
+    (doseq [[n1 n2] (:connections n)]
+      (let [name1 (name (:node n1))
+            name2 (name (:node n2))
+            b1 (select f [(keyword (str "#" name1))])
+            b2 (select f [(keyword (str "#" name2))])
+            k1 (keyword (get-widget-name name1))
+            k2 (keyword (get-widget-name name2))
+            m1 (get m k1)
+            m2 (get m k2)
+            node1 (modsynth.core.IONode. m1 b1 (:otype n1) (:stype n1))
+            node2 (modsynth.core.IONode. m2 b2 (:otype n2) (:stype n2))]
+        (connect-nodes {:node (get @synths (name (id-of m1))) :type (button-type b1) :otype (:otype n1)}  ;connect the synths
+                       {:node (get @synths (name (id-of m2))) :type (button-type b2) :otype (:otype n2)})
+        (swap! connections conj [node1 node2])))))
 
 (defn test-modsynth []
   (let [f (-main)
