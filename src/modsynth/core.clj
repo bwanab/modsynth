@@ -11,7 +11,8 @@
 (ns modsynth.core
   (:use [seesaw core border behave graphics]
         [modsynth.piano])
-  (:require [modsynth.synths :as s])
+  (:require [modsynth.synths :as s]
+            [clojure.string :as str])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
@@ -90,7 +91,7 @@
 
 (defn make-io [io t widget-id]
   (let [v (get io t)]
-    (for [b v] (button :text b :class t :id (str widget-id b)))))
+    (for [b v] (button :text b :class t :id (str widget-id "-" b)))))
 
 (defn connect-nodes [lnode wnode]
   (let [[n1 n2 out-type]
@@ -157,7 +158,7 @@
     widget))
 
 (defn get-id [t]
-  (str t (swap! next-id inc)))
+  (str t ":" (swap! next-id inc)))
 
 (defn- osc [e type]
   (add-widget type {:input ["freq"] :output ["sig"] :otype :audio} (label type)))
@@ -313,16 +314,46 @@
 ;;(def onode (modsynth.core.IONode. o b2 :freq s/saw-osc))    ; make IONode for saw-osc/freq
 ;;(swap! connections conj [mnode onode]                       ; put them in connections which causes connection to draw
 
-(defn test []
+(defn dump-nodes []
+  (map (fn [e] (let [l (config e :location)] {:x (.getX l) :y (.getY l) :w (config e :id)})) @nodes))
+
+(defn dump-connections []
+  (map (fn [e] (map (fn [d] {:node (config (:b d) :id) :otype (:ot d) :stype (:st d)}) e)) @connections))
+
+(defn dump-all []
+  {:nodes (dump-nodes) :connections (dump-connections) :master-vol (:master-vol @s-panel)})
+
+;; (defmacro make-node [ntype x y]
+;;   (let [node (symbol ntype)]
+;;     `(-> (~node 1)
+;;          (move! :by [~x ~y]))))
+
+(defn make-node [ntype x y]
+  (let [s (str "(" ntype " 1)")
+        m (load-string s)]
+    (move! m :by [x y])))
+
+(defn restore [n]
+  (reset! connections [])
+  (reset! nodes [])
+  (let [f (-main)]
+    (doseq [n (:nodes n)]
+      (let [s (first (str/split (name (:w n)) #":"))
+            x (:x n)
+            y (:y n)]
+        (println s x y)
+        (make-node s x y)))))
+
+
+
+(defn test-modsynth []
   (let [f (-main)
-        m (midi-in 1)
-        o (saw-osc 1)
-        b1 (select f [:#midi-in1freq])
-        b2 (select f [:#saw-osc2freq])
+        m (make-node "midi-in" 50 50)
+        o (make-node "saw-osc" 100 100)
+        b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+        b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
-    (move! m :by [50 50])
-    (move! o :by [100 100])
     (connect-nodes {:node (get @synths (name (id-of m))) :type (button-type b1) :otype :control}  ;connect the synths
                    {:node (get @synths (name (id-of o))) :type (button-type b2) :otype :audio})
     (swap! connections conj [mnode onode])))
