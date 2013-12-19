@@ -10,7 +10,8 @@
 
 (ns modsynth.core
   (:use [seesaw core border behave graphics]
-        [modsynth.piano])
+        [modsynth.piano]
+        [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
             [clojure.string :as str])
   (:import [javax.swing SwingUtilities]
@@ -314,14 +315,20 @@
 ;;(def onode (modsynth.core.IONode. o b2 :freq s/saw-osc))    ; make IONode for saw-osc/freq
 ;;(swap! connections conj [mnode onode]                       ; put them in connections which causes connection to draw
 
+(defn to-string [e]
+  (write e :stream nil :pretty false))
+
 (defn dump-nodes []
   (map (fn [e] (let [l (config e :location)] {:x (.getX l) :y (.getY l) :w (config e :id)})) @nodes))
 
+(defn dump-synth [s]
+  (symbol (second (str/split (str (type (s))) #" "))))
+
 (defn dump-connections []
-  (map (fn [e] (map (fn [d] {:node (config (:b d) :id) :otype (:ot d) :stype (:st d)}) e)) @connections))
+  (map (fn [e] (map (fn [d] {:node (config (:b d) :id) :otype (:ot d) :stype (dump-synth (:st d))}) e)) @connections))
 
 (defn dump-all []
-  {:nodes (dump-nodes) :connections (dump-connections) :master-vol (:master-vol @s-panel)})
+  {:nodes (symbol (str "'" (to-string (dump-nodes)))) :connections (symbol (str "'" (to-string (dump-connections)))) :master-vol (:master-vol @s-panel)})
 
 (defn make-node [ntype x y]
   (let [s (str "(" ntype " 1)")

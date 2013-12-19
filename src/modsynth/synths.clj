@@ -7,7 +7,7 @@
 
 ;; to work on gui without overtone uncomment these lines
 ;; ******
-(defmacro defsynth [name p body] `(defn ~name [] (comment ~p) (comment ~body)))
+(defmacro defsynth [name p body] `(defn ~name [] (comment ~p) ~name))
 (defn control-bus [x])
 (defn audio-bus [x])
 (defn ctl [x y z])
