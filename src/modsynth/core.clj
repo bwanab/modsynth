@@ -137,6 +137,7 @@
             ;;wa (get-io-width-adjustment b)
             ;;ha (get-io-height-adjustment b)
             wnode (IONode. widget b out-type stype)]
+        (println "stype=" stype)
         (listen b :action
                 (fn [e]
                   (if-let [lnode (:last-node @s-panel)]
@@ -322,7 +323,7 @@
   (map (fn [e] (let [l (config e :location)] {:x (.getX l) :y (.getY l) :w (config e :id)})) @nodes))
 
 (defn dump-synth [s]
-  (symbol (second (str/split (str (type (s))) #" "))))
+  (symbol (second (first s))))
 
 (defn dump-connections []
   (map (fn [e] (map (fn [d] {:node (config (:b d) :id) :otype (:ot d) :stype (dump-synth (:st d))}) e)) @connections))
@@ -341,9 +342,11 @@
     (str (first s) ":" (first n))))
 
 (defn restore [n]
+  (sound-off 0)
   (reset! connections [])
   (reset! nodes [])
   (reset! next-id 0)
+  (swap! s-panel assoc :master-vol (:master-vol n))
   (let [f (-main)
         m (apply hash-map
                  (flatten
@@ -361,11 +364,12 @@
             k2 (keyword (get-widget-name name2))
             m1 (get m k1)
             m2 (get m k2)
-            node1 (modsynth.core.IONode. m1 b1 (:otype n1) (:stype n1))
-            node2 (modsynth.core.IONode. m2 b2 (:otype n2) (:stype n2))]
+            node1 (modsynth.core.IONode. m1 b1 (:otype n1) (eval (symbol (str "modsynth.synths/" (:stype n1)))))
+            node2 (modsynth.core.IONode. m2 b2 (:otype n2) (eval (symbol (str "modsynth.synths/" (:stype n2)))))]
         (connect-nodes {:node (get @synths (name (id-of m1))) :type (button-type b1) :otype (:otype n1)}  ;connect the synths
                        {:node (get @synths (name (id-of m2))) :type (button-type b2) :otype (:otype n2)})
-        (swap! connections conj [node1 node2])))))
+        (swap! connections conj [node1 node2]))))
+  (sound-on 0))
 
 (defn test-modsynth []
   (let [f (-main)

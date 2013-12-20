@@ -1,5 +1,5 @@
 (ns modsynth.synths
-  ;(:use overtone.live)  ; to work on gui without overtone comment out this line
+  (:use overtone.live)  ; to work on gui without overtone comment out this line
   )
 
 ;;(defmacro mod-defsynth [name p body] (let [sym-name (symbol (eval name))] `(o/defsynth ~sym-name ~p ~body)))
@@ -7,11 +7,11 @@
 
 ;; to work on gui without overtone uncomment these lines
 ;; ******
-(defmacro defsynth [name p body] `(defn ~name [] (comment ~p) ~name))
-(defn control-bus [x])
-(defn audio-bus [x])
-(defn ctl [x y z])
-(defn volume [x])
+;; (defmacro defsynth [name p body] `(defn ~name [] (comment ~p) ~name))
+;; (defn control-bus [x])
+;; (defn audio-bus [x])
+;; (defn ctl [x y z])
+;; (defn volume [x])
 ;; *******
 
 
