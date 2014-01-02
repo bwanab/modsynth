@@ -33,6 +33,12 @@
   (let [freq (in:kr ibus 2)]
     (out obus (sin-osc freq))))
 
+(defsynth sin-vco
+  [obus 0
+   ibus 1
+   freq {:default 10 :min 0 :max 1000 :step 1}]
+  (out obus (* 100 (sin-osc:kr freq))))
+
 (defsynth square-osc
   [obus 0
    ibus 1
@@ -102,7 +108,7 @@
 
 (defn abus []  (audio-bus 2))
 
-(defn connect-nodes [n1 n2 ct]
+(defn connect-points [n1 n2 ct]
   (let [bus (if (= ct :audio) (abus) (cbus))]
     (ctl n1 :obus bus)
     (ctl n2 :ibus bus)

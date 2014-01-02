@@ -21,7 +21,7 @@
 (def s-panel (atom {}))
 (def next-id (atom 0))
 (def nodes (atom {}))
-(def connection-points (atom {}))
+(def points (atom {}))
 (def connections (atom []))
 
 (s/svolume 0.0)
@@ -60,7 +60,7 @@
   "return int values for x and y for a widget"
   [w]
   (let [widget (get-in w [:node :widget])
-        b (:con-point w)
+        b (:point w)
         ;; ew (:wa w)
         ;; eh (:ha w)
         ew (get-io-width-adjustment widget b)
@@ -80,8 +80,8 @@
       (.drawLine g 0 y w y))
      (.setColor g (Color/decode "#FFFFaa"))
      (doseq [[id1 id2] @connections]
-       (let [w1 (get @connection-points id1)
-             w2 (get @connection-points id2)
+       (let [w1 (get @points id1)
+             w2 (get @points id2)
              [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
          ;(println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
@@ -89,28 +89,34 @@
     ))
 
 (defn make-io [io t node-id]
-  (let [v (get io t)]
-    (for [b v] (button :text b :class t :id (str node-id "-" b)))))
+  (let [m (when-let [b (get io t)]
+            (button :text b :class t :id (str node-id "-" b)))
+        r (when (= t :input)
+            (for [c (filter #(not (contains? #{"obus" "ibus"} %)) (map :name (:params (:synth-type io))))]
+              (button :text c :class t :id (str node-id "-" c))))]
+    (if m
+      (cons m r)
+      (if r r []))))
 
 (defn get-synths [in out]
   (let [win (:node in)
         wout (:node out)]
     [(:synth win) (:synth wout) (:out-type win)]))
 
-(defn connect-nodes [lnode wnode]
+(defn connect-points [lpoint wpoint]
   (let [[n1 n2 out-type]
-        (if (= (button-type (:con-point lnode)) :output)
-          (get-synths lnode wnode)
-          (get-synths wnode lnode))]
-    (println lnode wnode)
+        (if (= (button-type (:point lpoint)) :output)
+          (get-synths lpoint wpoint)
+          (get-synths wpoint lpoint))]
+    ;(println lpoint wpoint)
     (println n1 n2 out-type)
-    (s/connect-nodes n1 n2 out-type)))
+    (s/connect-points n1 n2 out-type)))
 
 (defn get-params [stype name]
   (first (filter #(= (:name %) name) (:params stype))))
 
 (defn connect-manual [from to]
-  (let [name (text (:con-point to))
+  (let [name (text (:point to))
         t (keyword name)
         from-synth (get-in from [:node :synth])  ;; from-synth is currently a slider widget
         to-synth (get-in to [:node :synth])
@@ -118,7 +124,11 @@
         mn (:min p)
         mx (:max p)
         df (:default p)]
-    (println p)
+    (println "from=" from)
+    (println "to=" to)
+    (println "name=" name)
+    (println "from-synth=" from-synth)
+    (println "to-synth=" to-synth)
     (config! from-synth :min mn :max mx :value df :paint-labels? true :paint-ticks? true)
     (listen from-synth :change (fn [e] (s/sctl to-synth t (value from-synth))))))
 
@@ -145,24 +155,26 @@ Connections are references to two connection points
                                            )
                                    (config! :bounds :preferred)
                                    movable)
-                      :id kw :inputs ins :outputs outs)]
+                    :id kw :inputs ins :outputs outs)]
+    (println "add node " id)
     (swap! nodes assoc kw node)
     (doseq [b (concat ins outs)]
-      (let [wnode {:con-point b :node node}
+      (let [wpoint {:point b :node node}
             wid (config b :id)]
-        (swap! connection-points assoc wid wnode)
+        (swap! points assoc wid wpoint)
         (listen b :action
                 (fn [e]
-                  (if-let [lid (:last-node @s-panel)]
-                    (let [lnode (get @connection-points lid)]
-                      (when (not= (:node lnode) (:node wnode)) ; don't connect inputs to outputs of same node
-                        (cond (= :manual (get-in lnode [:node :out-type])) (connect-manual lnode wnode)
-                              (= :manual (get-in wnode [:node :out-type])) (connect-manual wnode lnode)
+                  (if-let [lid (:last-point @s-panel)]
+                    (let [lpoint (get @points lid)]
+                      (println "connecting points " lid wid)
+                      (when (not= lid wid) ; don't connect inputs to outputs of same node
+                        (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
+                              (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
                               :else
-                              (connect-nodes lnode wnode))
+                              (connect-points lpoint wpoint))
                         (swap! connections conj [lid wid])
-                        (swap! s-panel assoc :last-node  nil)))
-                    (swap! s-panel assoc :last-node wid))))))
+                        (swap! s-panel assoc :last-point  nil)))
+                    (swap! s-panel assoc :last-point wid))))))
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
                           (:widget node)))
@@ -173,7 +185,7 @@ Connections are references to two connection points
     (str t ":" id)))
 
 (defn- osc [name synth-type]
-  (add-node :name name :synth (synth-type) :input ["freq"] :output ["sig"] :out-type :audio :synth-type synth-type ))
+  (add-node :name name :synth (synth-type) :input "freq" :output "sig" :out-type :audio :synth-type synth-type ))
 
 (defn saw-osc [e]
   (let [id (get-id "saw-osc" e)]
@@ -181,44 +193,58 @@ Connections are references to two connection points
 
 (defn square-osc [e]
   (let [id (get-id "square-osc" e)]
-    (add-node :name id :synth (s/square-osc) :input ["freq" "width"] :output ["sig"] :out-type :audio :synth-type s/square-osc)))
+    (add-node :name id :synth (s/square-osc) :input "freq" :output "sig" :out-type :audio :synth-type s/square-osc)))
 
 (defn sin-osc [e]
   (let [id (get-id "sin-osc" e)]
-    (osc e id s/s_sin-osc)))
+    (osc id s/s_sin-osc)))
 
 (defn lp-filt [e]
   (let [id (get-id "lp-filt" e)]
-    (add-node :name id :synth (s/lp-filt) :input ["in" "cutoff"] :output ["out"] :out-type :audio :synth-type s/lp-filt )))
+    (add-node :name id :synth (s/lp-filt) :input "in" :output "out" :out-type :audio :synth-type s/lp-filt )))
 
 (defn hp-filt [e]
   (let [id (get-id "hp-filt" e)]
-    (add-node :name id :synth (s/hp-filt) :input ["in" "cutoff"] :output ["out"] :out-type :audio :synth-type s/hp-filt )))
+    (add-node :name id :synth (s/hp-filt) :input "in" :output "out" :out-type :audio :synth-type s/hp-filt) ))
 
 (defn bp-filt [e]
   (let [id (get-id "bp-filt" e)]
-    (add-node :name id :synth (s/bp-filt) :input ["in" "freq" "q"] :output ["out"] :out-type :audio :synth-type s/bp-filt )))
+    (add-node :name id :synth (s/bp-filt) :input "in" :output "out" :out-type :audio :synth-type s/bp-filt) ))
 
 (defn moog-filt [e]
   (let [id (get-id "moog-filt" e)]
-    (add-node :name id :synth (s/moog-filt) :input ["in" "cutoff" "lpf-res"] :output ["out"] :out-type :audio :synth-type s/moog-filt )))
+    (add-node :name id :synth (s/moog-filt) :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
+
+;; (defn freeverb [e]
+;;   (let [id (get-id "freeverb" e)]
+;;     (add-node :name id :synth (s/freeverb) :input ["in"] :output ["out"] :out-type :audio :synth-type s/freeverb )))
 
 (defn freeverb [e]
   (let [id (get-id "freeverb" e)]
-    (add-node :name id :synth (s/freeverb) :input ["in" "wet-dry" "room-size" "dampening"] :output ["out"] :out-type :audio :synth-type s/freeverb )))
+    (add-node :name id :synth (s/freeverb) :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
 
 (defn echo [e]
   (let [id (get-id "echo" e)]
-    (add-node :name id :synth (s/echo) :input ["in" "max-delay" "delay-time" "decay-time"] :output ["out"] :out-type :audio :synth-type s/echo )))
+    (add-node :name id :synth (s/echo) :input "in" :output "out" :out-type :audio :synth-type s/echo) ))
 
 (defn amp [e]
   (let [id (get-id "amp" e)]
-    (add-node :name id :synth (s/amp) :input ["in" "gain"] :output ["out"] :out-type :audio :synth-type s/amp )))
+    (add-node :name id :synth (s/amp) :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
+
+(defn sin-vco [e]
+  (let [id (get-id "sin-vco" e)
+        synth (s/sin-vco)]
+    (add-node :name id :synth synth :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
+
+(defn note-in [e]
+  (let [id (get-id "note-in" e)
+        synth (s/midi-in)]
+    (add-node :name id :synth synth :input "note" :output "freq" :out-type :control :synth-type s/midi-in)))
 
 (defn midi-in [e]
   (let [id (get-id "midi-in" e)
         synth (s/midi-in)]
-    (add-node :name id :synth synth :output ["freq"] :out-type :control
+    (add-node :name id :synth synth :output "freq" :out-type :control
                 :cent (text :text ""
                             :listen [:key-pressed (fn [e]
                                                     (println (.getKeyCode e))
@@ -230,11 +256,12 @@ Connections are references to two connection points
         p (piano (fn [k] (s/sctl synth :note k))
                  (fn [k] (s/sctl synth :note -1000)))]
     (show! p)
-    (add-node :name id :synth synth :output ["freq"] :out-type :control)))
+    (add-node :name id :synth synth :output "freq" :out-type :control)))
 
 (defn slider-ctl [e]
-  (let [id (get-id "slider" e)
-        s (slider :value 0 :min 0 :max 100 :orientation :vertical)]))
+  (let [id (get-id "slider-ctl" e)
+        s (slider :value 0 :min 0 :max 100 :orientation :vertical)]
+    (add-node :name id :synth s :output "val" :out-type :manual :cent s)))
 
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel)))
@@ -252,7 +279,7 @@ Connections are references to two connection points
 
 (defn fr []
   (let [p (make-panel)]
-    (swap! s-panel assoc :panel p :last-node nil :master-vol 0.3)
+    (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
     (frame
      :menubar (menubar :items [(menu :text "File"
                                      :items [(action :handler sound-on :name "Sound On")
@@ -262,10 +289,12 @@ Connections are references to two connection points
                                      :items [(action :handler saw-osc :name "Saw Osc")
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
+                                             (action :handler sin-vco :name "Sin VCO")
                                              (action :handler midi-in :name "Midi In")
+                                             (action :handler note-in :name "Note In")
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
-                                             (action :handler hp-filt :name "LP Filt")
+                                             (action :handler hp-filt :name "HP Filt")
                                              (action :handler moog-filt :name "Moog Filt")
                                              (action :handler freeverb :name "Freeverb")
                                              (action :handler echo :name "Echo")
@@ -299,7 +328,7 @@ Connections are references to two connection points
 ;;(move! o :by [100 100])
 ;;(def b1 (select f [:#midi-in1freq]))  ; get the two buttons we want to connect
 ;;(def b2 (select f [:#saw-osc2freq]))
-;;(connect-nodes {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;(connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
 ;;               {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
 ;;(def mnode (modsynth.core.IONode. m b1 :control s/midi-in)) ; make IONode for midi-in/freq
 ;;(def onode (modsynth.core.IONode. o b2 :freq s/saw-osc))    ; make IONode for saw-osc/freq
@@ -334,12 +363,16 @@ Connections are references to two connection points
         n (str/split (second s) #"-")]
     (str (first s) ":" (first n))))
 
-(defn restore [n]
+(defn ms-reset! []
   (sound-off 0)
   (reset! connections [])
-  (reset! connection-points {})
+  (reset! points {})
   (reset! nodes {})
   (reset! next-id 0)
+  )
+
+(defn restore [n]
+  (ms-reset!)
   (swap! s-panel assoc :master-vol (:master-vol n))
   (let [f (-main)
         m (apply hash-map
@@ -359,12 +392,13 @@ Connections are references to two connection points
             m1 (get m k1)
             m2 (get m k2)
             b1 (select f [(keyword (str "#" name1))])
-            b2 (select f [(keyword (str "#" name1))])
-            node1 {:con-point b1 :node m1}
-            node2 {:con-point b2 :node m2}]
-        (println node1)
-        (println node2)
-        (connect-nodes node1 node2)
+            b2 (select f [(keyword (str "#" name2))])
+            node1 {:point b1 :node m1}
+            node2 {:point b2 :node m2}]
+        (cond (= :manual (get-in node1 [:node :out-type])) (connect-manual node1 node2)
+              (= :manual (get-in node2 [:node :out-type])) (connect-manual node2 node1)
+              :else
+              (connect-points node1 node2))
         (swap! connections conj [n1 n2]))))
     (sound-on 0))
 
@@ -376,6 +410,6 @@ Connections are references to two connection points
 ;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
 ;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
 ;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
-;;     (connect-nodes {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
 ;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
 ;;     (swap! connections conj [mnode onode])))
