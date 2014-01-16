@@ -62,8 +62,9 @@
   [obus OB
    ibus IB
    width {:default B1 :def 50 :max 50 :min 10 :step 1}]
-  (let freq (in:kr ibus 1)
-    (out obus (pulse freq (/ w 100.0)))))
+  (let [freq (in:kr ibus 1)
+        w (+ 0.1 (* (in:kr width 1) 0.004))]
+    (out obus (pulse freq w))))
 
 ;; (defsynth square-osc
 ;;   [obus OB
@@ -76,38 +77,45 @@
   [cutoff {:default B1 :def 300 :min 0 :max 4000 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)]
-    (out obus (lpf sig (in:kr cutoff 1)))))
+  (let [sig (in:ar ibus 2)
+        c (* (in:kr cutoff 1) 40)]  ;; the input is 0-100, the out put must be 0-4000
+    (out obus (lpf sig c))))
 
 (defsynth hp-filt
   [cutoff {:default B1 :def 1000 :min 0 :max 300 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)]
-    (out obus (hpf sig (in:kr cutoff 1)))))
+  (let [sig (in:ar ibus 2)
+        c (* (in:kr cutoff 1) 3)]
+    (out obus (hpf sig c))))
 
 (defsynth bp-filt
   [freq {:default B1 :def 300 :min 100 :max 4000 :step 1}
    q {:default B2 :def 1 :min 1 :max 4 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)]
-    (out obus (bpf sig (in:kr freq 1) (in:kr q 1)))))
+  (let [sig (in:ar ibus 2)
+        f (+ 100 (* (in:kr freq 1) 40))
+        qq (+ 1 (* (in:kr q 1) 0.04))]
+    (out obus (bpf sig f qq))))
 
 (defsynth moog-filt
   [cutoff {:default B1 :def 300 :min 0 :max 4000 :step 1}
    lpf-res {:default B2 :def 50 :min 0 :max 100 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)]
-    (out obus (moog-ff sig (in:kr cutoff 1) (/ (in:kr lpf-res 1) 100.0)))))
+  (let [sig (in:ar ibus 2)
+        c (* (in:kr cutoff 1) 40)
+        l (* (in:kr lpf-res 1) 0.01)]
+    (out obus (moog-ff sig c l))))
 
 (defsynth amp
   [obus OB
    ibus IB
    gain  {:default B1 :def 20 :min 0 :max 100 :step :1}]
-  (let [sig (in:ar ibus 2)]
-    (out obus (* (/ (in:kr gain 1) 100.0) sig))))
+  (let [sig (in:ar ibus 2)
+        g (* (in:kr gain 1) 0.01)]
+    (out obus (* g sig))))
 
 (defsynth freeverb
   [obus OB
@@ -116,8 +124,11 @@
    room-size    {:default B2 :def 30 :min 0 :max 100 :step 1}
    dampening    {:default B3 :def 30 :min 0 :max 100 :step 1}
    ]
-  (let [sig (in:ar ibus 2)]
-    (out obus (free-verb sig (/ (in:kr wet-dry 1) 100.0) (/ (in:kr room-size 1) 100.0) (/ (in:kr dampening 1) 100) ))))
+  (let [sig (in:ar ibus 2)
+        w (/ (in:kr wet-dry 1) 100.0)
+        r (/ (in:kr room-size 1) 100.0)
+        d (/ (in:kr dampening 1) 100.0)]
+    (out obus (free-verb sig w r d))))
 
 (defsynth echo
   [obus OB
@@ -126,7 +137,10 @@
    delay-time {:default B2 :def 20 :min 0 :max 100 :step 1}
    decay-time {:default B3 :def 20 :min 0 :max 100 :step 1}]
   (let [sig (in:ar ibus 2)
-        echo (comb-n sig (/ (in:kr max-delay 1) 100.0) (/ (in:kr delay-time 1) 100.0) (/ (in:kr decay-time 1) 100.0))]
+        m   (/ (in:kr max-delay 1) 100.0)
+        dlt (/ (in:kr delay-time 1) 100.0)
+        dct (/ (in:kr decay-time 1) 100.0)
+        echo (comb-n sig m dlt dct)]
     (out obus (+ echo sig))))
 
 (defn bus-monitor-group [bs]
