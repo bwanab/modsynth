@@ -28,8 +28,8 @@
 
 (defsynth const
   [obus OB
-   val 0]
-  (out obus (* val 1.0)))
+   ibus 0]
+  (out obus (* ibus 1.0)))
 
 (defsynth midi-in
   [obus OB

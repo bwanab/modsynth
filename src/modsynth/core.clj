@@ -246,10 +246,6 @@ Connections are references to two connection points
   (let [id (get-id "moog-filt" e)]
     (add-node :name id :synth (make-synth s/moog-filt) :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
 
-;; (defn freeverb [e]
-;;   (let [id (get-id "freeverb" e)]
-;;     (add-node :name id :synth (make-synth s/freeverb) :input ["in"] :output ["out"] :out-type :audio :synth-type s/freeverb )))
-
 (defn freeverb [e]
   (let [id (get-id "freeverb" e)]
     (add-node :name id :synth (make-synth s/freeverb) :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
@@ -280,8 +276,8 @@ Connections are references to two connection points
 (defn const [e]
   (let [id (get-id "const" e)
         synth (s/const)
-        t (text :text "     ")]
-    (config! t :listen [:action (fn [e] (s/sctl synth :val (read-string (text t))))])
+        t (text :text "     " :columns 5)]
+    (config! t :listen [:action (fn [e] (s/sctl synth :ibus (read-string (text t))))])
     (add-node :name id :synth synth :output "val" :out-type :control :synth-type s/const
               :cent t)))
 
@@ -289,7 +285,7 @@ Connections are references to two connection points
   (let [id (get-id "midi-in" e)
         synth (s/midi-in)]
     (add-node :name id :synth synth :output "freq" :out-type :control
-                :cent (text :text ""
+                :cent (text :text "" :columns 1
                             :listen [:key-pressed (fn [e]
                                                     (println (.getKeyCode e))
                                                     (s/sctl synth :note (.getKeyCode e)))]))))
