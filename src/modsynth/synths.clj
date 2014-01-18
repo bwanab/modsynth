@@ -131,16 +131,16 @@
     (out obus (free-verb sig w r d))))
 
 (defsynth echo
+  "max delay 5 seconds, so delay-time input 100 = 5 second delay"
   [obus OB
    ibus IB
-   max-delay {:default B1 :def 20 :min 0 :max 500 :step 1}
    delay-time {:default B2 :def 20 :min 0 :max 100 :step 1}
    decay-time {:default B3 :def 20 :min 0 :max 100 :step 1}]
   (let [sig (in:ar ibus 2)
-        m   (/ (in:kr max-delay 1) 100.0)
-        dlt (/ (in:kr delay-time 1) 100.0)
-        dct (/ (in:kr decay-time 1) 100.0)
-        echo (comb-n sig m dlt dct)]
+        max 5
+        dlt (/ (in:kr delay-time 1) 20.0)
+        dct (/ (in:kr decay-time 1) 20.0)
+        echo (comb-n sig max dlt dct)]
     (out obus (+ echo sig))))
 
 (defn bus-monitor-group [bs]

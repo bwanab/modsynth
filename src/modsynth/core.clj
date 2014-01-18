@@ -383,7 +383,8 @@ Connections are references to two connection points
   (map (fn [e]
          (let [w (:widget e)
                l (config w :location)]
-           {:x (.getX l) :y (.getY l) :w (config w :id)})) (vals @nodes)))
+           {:x (.getX l) :y (.getY l) :w (config w :id)}))
+       (vals @nodes)))
 
 (defn dump-synth [s]
   (symbol (second (first s))))
@@ -392,7 +393,9 @@ Connections are references to two connection points
   @connections)
 
 (defn dump-all []
-  {:nodes (symbol (str "'" (to-string (dump-nodes)))) :connections (symbol (str "'" (to-string (dump-connections)))) :master-vol (:master-vol @s-panel)})
+  {:nodes (symbol (str "'" (to-string (dump-nodes))))
+   :connections (symbol (str "'" (to-string (dump-connections))))
+   :master-vol (:master-vol @s-panel)})
 
 (defn make-node [ntype id x y]
   (let [s (str "(" ntype " " id ")")
