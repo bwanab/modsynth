@@ -283,12 +283,13 @@ Connections are references to two connection points
 
 (defn midi-in [e]
   (let [id (get-id "midi-in" e)
-        synth (s/midi-in)]
-    (add-node :name id :synth synth :output "freq" :out-type :control
-                :cent (text :text "" :columns 1
-                            :listen [:key-pressed (fn [e]
-                                                    (println (.getKeyCode e))
-                                                    (s/sctl synth :note (.getKeyCode e)))]))))
+        synth (s/midi-in)
+        t (text :text "" :columns 1
+                :listen [:key-pressed (fn [e]
+                                        (let [n (max 127 (.getKeyCode e))]
+                                          (println n)
+                                          (s/sctl synth :note n)))])]
+    (add-node :name id :synth synth :output "freq" :out-type :control :cent t)))
 
 (defn piano-in [e]
   (let [id (get-id "piano-in" e)
