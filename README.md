@@ -12,15 +12,15 @@ A modular synth system somewhat along the lines of PD, but at a higher level of 
 ## Roadmap
 
 ### What it still needs before it's usable:
-1. Save/restore dialog
-* save/restore needs to be better tested.
-* Save values for sliders and const.
-* Fix slider.
-* A disconnect method.
-* splitter and mixer nodes for audio and control.
-* More synth types:
-** Random note and timing
-** some kind of file input for compositions if there is an overtone standard use that.
+[] Save/restore dialog
+[] save/restore needs to be better tested.
+[] Save values for sliders and const.
+[] Fix slider.
+[] A disconnect method.
+[] splitter and mixer nodes for audio and control.
+[] More synth types:
+[] Random note and timing
+[] some kind of file input for compositions if there is an overtone standard use that.
 
 ## License
 
