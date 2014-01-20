@@ -171,6 +171,16 @@
                     (s/sctl c :val val)))))
     synth))
 
+(defn make-connection
+  [lid lpoint wid wpoint]
+  (when (not= lid wid) ; don't connect inputs to outputs of same node
+    (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
+          (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
+          :else
+          (let [c (connect-points lpoint wpoint)]
+            (swap! busses assoc (:name c) c)))
+    (swap! connections conj [lid wid])
+    (swap! s-panel assoc :last-point  nil)))
 
 "
 Each element on the screen is a node. Each node represents a visual widget and a synth or a manual controller like a slider. Every node
@@ -208,14 +218,7 @@ Connections are references to two connection points
                   (if-let [lid (:last-point @s-panel)]
                     (let [lpoint (get @points lid)]
                       (println "connecting points " lid wid)
-                      (when (not= lid wid) ; don't connect inputs to outputs of same node
-                        (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
-                              (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
-                              :else
-                              (let [c (connect-points lpoint wpoint)]
-                                (swap! busses assoc (:name c) c)))
-                        (swap! connections conj [lid wid])
-                        (swap! s-panel assoc :last-point  nil)))
+                      (make-connection lid lpoint wid wpoint))
                     (swap! s-panel assoc :last-point wid))))))
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
@@ -441,7 +444,17 @@ Connections are references to two connection points
   (reset! next-id 0)
   )
 
-(defn restore [n]
+(defn restore-node
+  [n node-map frame]
+  (let [name (name n)
+        k (keyword (get-node-name name))
+        m (get node-map k)
+        b (select frame [(keyword (str "#" name))])]
+    {:point b :node m}))
+
+(defn restore
+  "usage: (restore (load-file fff.clj))"
+  [n]
   (ms-reset!)
   (swap! s-panel assoc :master-vol (:master-vol n))
   (let [f (-main)
@@ -455,21 +468,9 @@ Connections are references to two connection points
                           y (:y n)]
                       [(:w n) (make-node wname wnum x y)]))))]
     (doseq [[n1 n2] (:connections n)]
-      (let [name1 (name n1)
-            name2 (name n2)
-            k1 (keyword (get-node-name name1))
-            k2 (keyword (get-node-name name2))
-            m1 (get m k1)
-            m2 (get m k2)
-            b1 (select f [(keyword (str "#" name1))])
-            b2 (select f [(keyword (str "#" name2))])
-            node1 {:point b1 :node m1}
-            node2 {:point b2 :node m2}]
-        (cond (= :manual (get-in node1 [:node :out-type])) (connect-manual node1 node2)
-              (= :manual (get-in node2 [:node :out-type])) (connect-manual node2 node1)
-              :else
-              (connect-points node1 node2))
-        (swap! connections conj [n1 n2]))))
+      (let [node1 (restore-node n1 m f)
+            node2 (restore-node n2 m f)]
+        (make-connection n1 node1 n2 node2))))
     (sound-on 0))
 
 ;; (defn test-modsynth []
