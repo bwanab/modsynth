@@ -124,18 +124,22 @@
   (let [win (:node in)
         wout (:node out)
         in-name (get-point-name in)
+        in-ctl-name (text (:point in))
         out-name (get-point-name out)
         ctl-name (text (:point out))
         out-bus (if (contains? (set (get-synth-controls (:synth-type wout))) ctl-name)
                   (keyword ctl-name)
-                  :ibus)]
-    [(:synth win) (:synth wout) (:out-type win) out-bus (str in-name " -> " out-name)]))
+                  :ibus)
+        in-bus (if (contains? (set (get-synth-controls (:synth-type win))) in-ctl-name)
+                 (keyword in-ctl-name)
+                 :obus)]
+    [(:synth win) (:synth wout) (:out-type win) out-bus (str in-name " -> " out-name) in-bus]))
 
 (defn connect-points [lpoint wpoint]
-  (let [[n1 n2 out-type ctl bus-name] (if (= (button-type (:point lpoint)) :output)
-                                        (get-synths lpoint wpoint)
-                                        (get-synths wpoint lpoint))]
-    (s/connect-points n1 n2 out-type ctl bus-name)))
+  (let [[n1 n2 out-type ctl bus-name in-ctl] (if (= (button-type (:point lpoint)) :output)
+                                               (get-synths lpoint wpoint)
+                                               (get-synths wpoint lpoint))]
+    (s/connect-points n1 n2 out-type ctl bus-name in-ctl)))
 
 (defn get-params [stype name]
   (first (filter #(= (:name %) name) (:params stype))))
@@ -265,6 +269,10 @@ Connections are references to two connection points
   (let [id (get-id "amp" e)]
     (add-node :name id :synth (make-synth s/amp) :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
 
+(defn pct-add [e]
+  (let [id (get-id "pct-add" e)]
+    (add-node :name id :synth (make-synth s/pct-add) :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
+
 (defn sin-vco [e]
   (let [id (get-id "sin-vco" e)
         synth (make-synth s/sin-vco)]
@@ -354,6 +362,7 @@ Connections are references to two connection points
                                              (action :handler freeverb :name "Freeverb")
                                              (action :handler echo :name "Echo")
                                              (action :handler amp :name "Amp")
+                                             (action :handler pct-add :name "Pct Add")
                                              (action :handler slider-ctl :name "Slider")
                                              (action :handler c-splitter :name "Control Splitter")
                                              (action :handler audio-out :name "Audio out")

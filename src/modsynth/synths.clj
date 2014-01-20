@@ -128,6 +128,15 @@
         l (* (in:kr lpf-res 1) 0.01)]
     (out obus (moog-ff sig c l))))
 
+(defsynth pct-add
+  "50 = 0%, 0 = -50%, 100= +50%"
+  [obus OB
+   ibus IB
+   gain  {:default B1 :def 50 :min 0 :max 100 :step :1}]
+  (let [sig (in:kr ibus 1)
+        g (+ (* (in:kr gain 1) 0.01) 0.5)]
+    (out obus (* sig g))))
+
 (defsynth amp
   [obus OB
    ibus IB
@@ -177,7 +186,7 @@
   ([n1 n2 ct c name] (connect-points n1 n2 ct c name :obus))
   ([n1 n2 ct c name ob]
    (let [bus (if (= ct :audio) (abus name) (cbus name))]
-     (println "connect points: " bus n1 n2 ct c name)
+     (println "connect points: " bus n1 n2 ct c name ob)
      (ctl n1 ob bus)
      (ctl n2 c bus)
      bus)))
