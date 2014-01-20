@@ -15,6 +15,8 @@
 ;; *******
 
 (def OB 2)
+(def OB1 OB)
+(def OB2 (inc OB))
 (def IB (+ OB 2))
 (def B1 (+ IB 2))
 (def B2 (inc B1))
@@ -23,8 +25,25 @@
 
 (defsynth audio-out
   [obus 0
+   b1 B1
+   b2 B2]
+  (out obus [(in:ar b1 1) (in:ar b2 1) ]))
+
+(defsynth c-splitter
+  [ob1 OB1
+   ob2 OB2
    ibus IB]
-  (out obus (in:ar ibus 1)))
+  (let [input (in:kr ibus 1)]
+    (out ob1 input)
+    (out ob2 input)))
+
+(defsynth a-splitter
+  [ob1 OB1
+   ob2 OB2
+   ibus IB]
+  (let [input (in:ar ibus 1)]
+    (out ob1 input)
+    (out ob2 input)))
 
 (defsynth const
   [obus OB
@@ -153,13 +172,15 @@
 
 (defn abus [name]  (audio-bus 2 name))
 
-(defn connect-points [n1 n2 ct c & name]
-  (let [bname (if name (first name) "no-name")
-        bus (if (= ct :audio) (abus bname) (cbus bname))]
-    (println "connect points: " bus n1 n2 ct c bname)
-    (ctl n1 :obus bus)
-    (ctl n2 c bus)
-    bus))
+(defn connect-points
+  ([n1 n2 ct c] (connect-points n1 n2 ct c "no-name" :obus))
+  ([n1 n2 ct c name] (connect-points n1 n2 ct c name :obus))
+  ([n1 n2 ct c name ob]
+   (let [bus (if (= ct :audio) (abus name) (cbus name))]
+     (println "connect points: " bus n1 n2 ct c name)
+     (ctl n1 ob bus)
+     (ctl n2 c bus)
+     bus)))
 
 (defn connect-controls
  [n1 n2 c]
@@ -239,7 +260,33 @@
         s (saw-osc)
         a (audio-out)]
     [(connect-points m s :control :ibus "midi-in -> saw-osc")
-     (connect-points s a :audio :ibus "saw-osc -> audio-out")]))
+     (connect-points s a :audio :b1 "saw-osc -> audio-out")]))
+
+(defn s-test4b []
+  (let [c1 (midi-in)
+        c2 (midi-in)
+        s1 (saw-osc)
+        s2 (saw-osc)
+        a (audio-out)]
+    (ctl c1 :note 48)
+    (ctl c2 :note 60)
+    [(connect-points c1 s1 :control :ibus "midi-in -> saw-osc1")
+     (connect-points c2 s2 :control :ibus "midi-in -> saw-osc2")
+     (connect-points s1 a :audio :b1 "saw-osc -> audio-out1")
+     (connect-points s2 a :audio :b2 "saw-osc -> audio-out2")]))
+
+(defn s-test4c []
+  (let [c1 (midi-in)
+        sp (splitter)
+        s1 (saw-osc)
+        s2 (saw-osc)
+        a (audio-out)]
+    (ctl c1 :note 48)
+    [(connect-points c1 sp :control :ibus "midi-in -> splitter")
+     (connect-points sp s1 :control :ibus "midi-in -> saw-osc1" :ob1)
+     (connect-points sp s2 :control :ibus "midi-in -> saw-osc2" :ob2)
+     (connect-points s1 a :audio :b1 "saw-osc -> audio-out1")
+     (connect-points s2 a :audio :b2 "saw-osc -> audio-out2")]))
 
 (defn s-test5 []
   (let [m (midi-in)

@@ -122,7 +122,6 @@
         out-bus (if (contains? (set (get-synth-controls (:synth-type wout))) ctl-name)
                   (keyword ctl-name)
                   :ibus)]
-    ;;(println "out-name = " out-name " controls = " (get-synth-controls (:synth-type wout)) "out-bus = " out-bus)
     [(:synth win) (:synth wout) (:out-type win) out-bus (str in-name " -> " out-name)]))
 
 (defn connect-points [lpoint wpoint]
@@ -271,7 +270,13 @@ Connections are references to two connection points
 (defn audio-out [e]
   (let [id (get-id "audio-out" e)
         synth (make-synth s/audio-out)]
-    (add-node :name id :synth synth :input "in" :output "out" :out-type :audio :synth-type s/audio-out)))
+    (add-node :name id :synth synth :output "out" :out-type :audio :synth-type s/audio-out)))
+
+(defn c-splitter [e]
+  (let [id (get-id "c-splitter" e)
+        synth (make-synth s/c-splitter)]
+    (add-node :name id :synth synth :output :split :out-type :control :synth-type s/c-splitter)))
+
 
 (defn const [e]
   (let [id (get-id "const" e)
@@ -286,7 +291,7 @@ Connections are references to two connection points
         synth (s/midi-in)
         t (text :text "" :columns 1
                 :listen [:key-pressed (fn [e]
-                                        (let [n (max 127 (.getKeyCode e))]
+                                        (let [n (min 127 (.getKeyCode e))]
                                           (println n)
                                           (s/sctl synth :note n)))])]
     (add-node :name id :synth synth :output "freq" :out-type :control :cent t)))
