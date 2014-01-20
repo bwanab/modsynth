@@ -98,15 +98,22 @@
 (defn get-synth-controls [s]
   (filter #(not (contains? #{"obus" "ibus"} %)) (map :name (:params s))))
 
-(defn make-io [io t node-id]
-  (let [m (when-let [b (get io t)]
-            (button :text b :class t :id (str node-id "-" b)))
-        r (when (= t :input)
-            (for [c (get-synth-controls (:synth-type io))]
-              (button :text c :class t :id (str node-id "-" c))))]
-    (if m
-      (cons m r)
-      (if r r []))))
+(defn make-io
+  [io t node-id otype]
+  (println t otype)
+  (if (= otype :split) ; special case code for splitter
+    (if (= t :input)
+      [(button :text "in" :class t :id (str node-id "-in"))]
+      (for [c (get-synth-controls (:synth-type io))]
+        (button :text c :class t :id (str node-id "-" c))))
+    (let [m (when-let [b (get io t)]
+              (button :text b :class t :id (str node-id "-" b)))
+          r (when (or (= t :input))
+              (for [c (get-synth-controls (:synth-type io))]
+                (button :text c :class t :id (str node-id "-" c))))]
+      (if m
+        (cons m r)
+        (if r r [])))))
 
 (defn get-point-name [point]
   (let [n (:node point)
@@ -173,8 +180,9 @@ Connections are references to two connection points
   (let [io (apply hash-map ps)
         id (:name io)
         kw (keyword id)
-        ins  (make-io io :input id)
-        outs  (make-io io :output id)
+        otype (:output io)
+        ins  (make-io io :input id otype)
+        outs  (make-io io :output id otype)
         node (assoc io :widget (doto (border-panel :id id
                                            :border (line-border :top 1 :color "#AAFFFF")
                                            :north (label :text id :background "#AAFFFF" :h-text-position :center)
@@ -347,6 +355,7 @@ Connections are references to two connection points
                                              (action :handler echo :name "Echo")
                                              (action :handler amp :name "Amp")
                                              (action :handler slider-ctl :name "Slider")
+                                             (action :handler c-splitter :name "Control Splitter")
                                              (action :handler audio-out :name "Audio out")
                                              ])])
      :title   "Overtone Modular Synth"

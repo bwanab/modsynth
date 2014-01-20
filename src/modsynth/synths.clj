@@ -277,7 +277,7 @@
 
 (defn s-test4c []
   (let [c1 (midi-in)
-        sp (splitter)
+        sp (c-splitter)
         s1 (saw-osc)
         s2 (saw-osc)
         a (audio-out)]
