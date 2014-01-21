@@ -296,6 +296,11 @@ Connections are references to two connection points
         synth (make-synth s/c-splitter)]
     (add-node :name id :synth synth :output :split :out-type :control :synth-type s/c-splitter)))
 
+(defn a-splitter [e]
+  (let [id (get-id "a-splitter" e)
+        synth (make-synth s/a-splitter)]
+    (add-node :name id :synth synth :output :split :out-type :audio :synth-type s/a-splitter)))
+
 
 (defn const [e]
   (let [id (get-id "const" e)
@@ -368,6 +373,7 @@ Connections are references to two connection points
                                              (action :handler pct-add :name "Pct Add")
                                              (action :handler slider-ctl :name "Slider")
                                              (action :handler c-splitter :name "Control Splitter")
+                                             (action :handler a-splitter :name "Audio Splitter")
                                              (action :handler audio-out :name "Audio out")
                                              ])])
      :title   "Overtone Modular Synth"

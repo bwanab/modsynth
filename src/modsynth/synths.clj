@@ -202,6 +202,11 @@
 (def sctl ctl)
 (def svolume volume)
 
+(defn print-test-monitors [b]
+  (doseq [c b]
+    (let [m (bus-monitor c)]
+      (println (:name c) (deref m)))))
+
 (defn s-test1 []
   (let [m (midi-in)
         s (square-osc)
@@ -258,11 +263,11 @@
         v (sin-vco)
         a (audio-out)
         c (const)]
-    (connect-points m s :control :ibus)
-    (connect-points v s :control :width)
-    (connect-points c v :control :ibus)
-    (connect-points s a :audio :ibus)
-    (ctl c :val 0.2)))
+    (ctl c :ibus 0.2)
+    [(connect-points m s :control :ibus "midi-in -> square-osc:in")
+     (connect-points v s :control :width "sin-vco -> square-osc:width")
+     (connect-points c v :control :ibus "const -> sin-vco")
+     (connect-points s a :audio :b1 "square-osc -> audio-out")]))
 
 (defn s-test4a []
   (let [m (midi-in)
