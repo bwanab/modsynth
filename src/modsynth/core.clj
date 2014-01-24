@@ -217,7 +217,6 @@ Connections are references to two connection points
                 (fn [e]
                   (if-let [lid (:last-point @s-panel)]
                     (let [lpoint (get @points lid)]
-                      (println "connecting points " lid wid)
                       (make-connection lid lpoint wid wpoint))
                     (swap! s-panel assoc :last-point wid))))))
     (config! (:panel @s-panel)
@@ -433,6 +432,7 @@ Connections are references to two connection points
 (defn make-node [ntype id x y]
   (let [s (str "(" ntype " " id ")")
         m (load-string s)]
+    (println "s = " s)
     (move! (:widget m) :by [x y])
     m))
 
@@ -476,8 +476,9 @@ Connections are references to two connection points
     (doseq [[n1 n2] (:connections n)]
       (let [node1 (restore-node n1 m f)
             node2 (restore-node n2 m f)]
-        (make-connection n1 node1 n2 node2))))
-    (sound-on 0))
+        (make-connection n1 node1 n2 node2)
+        (swap! s-panel assoc :last-point n2))))
+  (sound-on 0))
 
 ;; (defn test-modsynth []
 ;;   (let [f (-main)
