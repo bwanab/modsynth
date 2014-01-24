@@ -458,22 +458,65 @@ Connections are references to two connection points
         b (select frame [(keyword (str "#" name))])]
     {:point b :node m}))
 
-(defn restore
-  "usage: (restore (load-file fff.clj))"
+(defn partition-with
+  "partitions all elements to two buckets where first is pred is true, second is pred is false
+
+   this is how I always think of partition-by working, but it has a different behavior."
+  [pred coll]
+  [(filter pred coll)
+   (filter (complement pred) coll)])
+
+(defn get-starts
+  "n is (:connections (load-file xxx.clj))"
   [n]
+  (let [cn (for [[f t] n]
+             [(get-node-name (name f)) (get-node-name (name t))])
+        tos (into #{} (for [[f t] cn] t))]
+    (filter #(not (contains? tos %)) (for [[f t] cn] f))))
+
+(defn get-chain [s1 n]
+  (let [[neighbors others] (partition-with #(= s1 (get-node-name (name (first %)))) n)]
+    (if (empty? neighbors)
+      s1
+      [s1 (for [[f t] neighbors] (get-chain (get-node-name (name t)) others))])))
+
+(defn get-order [n]
+  (let [s (get-starts n)
+        l (flatten (for [s1 s]
+                     (get-chain s1 n)))]
+    (map #(keyword %) (distinct l))))
+
+
+(defn restore
+  "usage: (restore (load-file fff.clj))
+
+   strangely, it matters what order the nodes are created in. My best
+   guess, which seems to work is that they need to more or less be added
+   from source to sink. So starting with the freq gens, to the oscillators,
+   filters to the audio out. I don't know why this is true
+
+   TODO: What I really need to do is have an edit mode so the user can put the
+   nodes on the canvas in any order, then when the sound-on is hit, create
+   the synths in the right order irrespective of how the user put them in.
+"
+  [r]
   (ms-reset!)
-  (swap! s-panel assoc :master-vol (:master-vol n))
+  (swap! s-panel assoc :master-vol (:master-vol r))
   (let [f (-main)
+        o (get-order (:connections r))
+        node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
         m (apply hash-map
                  (flatten
-                  (for [n (:nodes n)]
-                    (let [s (str/split (name (:w n)) #":")
+                  (for [n1 o]
+                    (let [n (get node-map n1)
+                          s (str/split (name (:w n)) #":")
                           wname (first s)
                           wnum  (second s)
                           x (:x n)
                           y (:y n)]
+                      (println n s wname wnum x y)
                       [(:w n) (make-node wname wnum x y)]))))]
-    (doseq [[n1 n2] (:connections n)]
+    (doseq [[n1 n2] (:connections r)]
       (let [node1 (restore-node n1 m f)
             node2 (restore-node n2 m f)]
         (make-connection n1 node1 n2 node2)
@@ -491,16 +534,3 @@ Connections are references to two connection points
 ;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
 ;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
 ;;     (swap! connections conj [mnode onode])))
-
-(defn get-starts [n]
-  (let [cn (for [[f t] (:connections n)]
-             [(get-node-name (name f)) (get-node-name (name t))])
-        tos (into #{} (for [[t n] cn] n))]
-    (filter #(not (contains? tos %)) (for [[t n] cn] t))))
-(defn get-order [n]
-  (loop [s (get-starts n)
-         r []
-         l n
-         a []]
-    (for [s1 s] (let  [[f re] (partition-by #(= s1 (first %) l))]
-                  ))))
