@@ -491,3 +491,16 @@ Connections are references to two connection points
 ;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
 ;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
 ;;     (swap! connections conj [mnode onode])))
+
+(defn get-starts [n]
+  (let [cn (for [[f t] (:connections n)]
+             [(get-node-name (name f)) (get-node-name (name t))])
+        tos (into #{} (for [[t n] cn] n))]
+    (filter #(not (contains? tos %)) (for [[t n] cn] t))))
+(defn get-order [n]
+  (loop [s (get-starts n)
+         r []
+         l n
+         a []]
+    (for [s1 s] (let  [[f re] (partition-by #(= s1 (first %) l))]
+                  ))))
