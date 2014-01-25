@@ -201,6 +201,7 @@
 
 (def sctl ctl)
 (def svolume volume)
+(def skill kill)
 
 (defn print-test-monitors [b]
   (doseq [c b]

@@ -174,11 +174,12 @@
 (defn make-connection
   [lid lpoint wid wpoint]
   (when (not= lid wid) ; don't connect inputs to outputs of same node
-    (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
-          (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
-          :else
-          (let [c (connect-points lpoint wpoint)]
-            (swap! busses assoc (:name c) c)))
+    (if (:run-mode @s-panel)
+      (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
+            (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
+            :else
+            (let [c (connect-points lpoint wpoint)]
+              (swap! busses assoc (:name c) c))))
     (swap! connections conj [lid wid])
     (swap! s-panel assoc :last-point  nil)))
 
@@ -229,95 +230,106 @@ Connections are references to two connection points
     (str t ":" id)))
 
 (defn- osc [name synth-type]
-  (add-node :name name :synth (make-synth synth-type) :input "freq" :output "sig" :out-type :audio :synth-type synth-type ))
+  (let [f (fn [] (make-synth synth-type))]
+    (add-node :name name :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type synth-type )))
 
 (defn saw-osc [e]
   (let [id (get-id "saw-osc" e)]
     (osc id s/saw-osc)))
 
 (defn square-osc [e]
-  (let [id (get-id "square-osc" e)]
-    (add-node :name id :synth (make-synth s/square-osc) :input "freq" :output "sig" :out-type :audio :synth-type s/square-osc)))
+  (let [id (get-id "square-osc" e)
+        f (fn [] (make-synth s/square-osc))]
+    (add-node :name id :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type s/square-osc)))
 
 (defn sin-osc [e]
   (let [id (get-id "sin-osc" e)]
     (osc id s/s_sin-osc)))
 
 (defn lp-filt [e]
-  (let [id (get-id "lp-filt" e)]
-    (add-node :name id :synth (make-synth s/lp-filt) :input "in" :output "out" :out-type :audio :synth-type s/lp-filt )))
+  (let [id (get-id "lp-filt" e)
+        f (fn [] (make-synth s/lp-filt))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/lp-filt )))
 
 (defn hp-filt [e]
-  (let [id (get-id "hp-filt" e)]
-    (add-node :name id :synth (make-synth s/hp-filt) :input "in" :output "out" :out-type :audio :synth-type s/hp-filt) ))
+  (let [id (get-id "hp-filt" e)
+        f (fn [] (make-synth s/hp-filt))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/hp-filt) ))
 
 (defn bp-filt [e]
-  (let [id (get-id "bp-filt" e)]
-    (add-node :name id :synth (make-synth s/bp-filt) :input "in" :output "out" :out-type :audio :synth-type s/bp-filt) ))
+  (let [id (get-id "bp-filt" e)
+        f (fn [] (make-synth s/bp-filt))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/bp-filt) ))
 
 (defn moog-filt [e]
-  (let [id (get-id "moog-filt" e)]
-    (add-node :name id :synth (make-synth s/moog-filt) :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
+  (let [id (get-id "moog-filt" e)
+        f (fn [] (make-synth s/moog-filt))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
 
 (defn freeverb [e]
-  (let [id (get-id "freeverb" e)]
-    (add-node :name id :synth (make-synth s/freeverb) :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
+  (let [id (get-id "freeverb" e)
+        f (fn [] (make-synth s/freeverb))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
 
 (defn echo [e]
-  (let [id (get-id "echo" e)]
-    (add-node :name id :synth (make-synth s/echo) :input "in" :output "out" :out-type :audio :synth-type s/echo) ))
+  (let [id (get-id "echo" e)
+        f (fn [] (make-synth s/echo))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/echo) ))
 
 (defn amp [e]
-  (let [id (get-id "amp" e)]
-    (add-node :name id :synth (make-synth s/amp) :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
+  (let [id (get-id "amp" e)
+        f (fn [] (make-synth s/amp))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
 
 (defn pct-add [e]
-  (let [id (get-id "pct-add" e)]
-    (add-node :name id :synth (make-synth s/pct-add) :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
+  (let [id (get-id "pct-add" e)
+        f (fn [] (make-synth s/pct-add))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
 
 (defn sin-vco [e]
   (let [id (get-id "sin-vco" e)
-        synth (make-synth s/sin-vco)]
-    (add-node :name id :synth synth :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
+        f (fn []  (make-synth s/sin-vco))]
+    (add-node :name id :play-fn f :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
 
 (defn note-in [e]
   (let [id (get-id "note-in" e)
-        synth (make-synth s/midi-in)]
-    (add-node :name id :synth synth :input "note" :output "freq" :out-type :control :synth-type s/midi-in)))
+        f (fn []  (make-synth s/midi-in))]
+    (add-node :name id :play-fn f :input "note" :output "freq" :out-type :control :synth-type s/midi-in)))
 
 (defn audio-out [e]
   (let [id (get-id "audio-out" e)
-        synth (make-synth s/audio-out)]
-    (add-node :name id :synth synth :output "out" :out-type :audio :synth-type s/audio-out)))
+        f (fn []  (make-synth s/audio-out))]
+    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-out)))
 
 (defn c-splitter [e]
   (let [id (get-id "c-splitter" e)
-        synth (make-synth s/c-splitter)]
-    (add-node :name id :synth synth :output :split :out-type :control :synth-type s/c-splitter)))
+        f (fn []  (make-synth s/c-splitter))]
+    (add-node :name id :play-fn f :output :split :out-type :control :synth-type s/c-splitter)))
 
 (defn a-splitter [e]
   (let [id (get-id "a-splitter" e)
-        synth (make-synth s/a-splitter)]
-    (add-node :name id :synth synth :output :split :out-type :audio :synth-type s/a-splitter)))
-
+        f (fn [] (make-synth s/a-splitter))]
+    (add-node :name id :play-fn f :output :split :out-type :audio :synth-type s/a-splitter)))
 
 (defn const [e]
   (let [id (get-id "const" e)
-        synth (s/const)
-        t (text :text "     " :columns 5)]
-    (config! t :listen [:action (fn [e] (s/sctl synth :ibus (read-string (text t))))])
-    (add-node :name id :synth synth :output "val" :out-type :control :synth-type s/const
+        t (text :text "     " :columns 5)
+        f (fn [] (let [synth (s/const)]
+                  (config! t :listen [:action (fn [e] (s/sctl synth :ibus (read-string (text t))))])
+                  synth))]
+    (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
               :cent t)))
 
 (defn midi-in [e]
   (let [id (get-id "midi-in" e)
-        synth (s/midi-in)
-        t (text :text "" :columns 1
-                :listen [:key-pressed (fn [e]
-                                        (let [n (min 127 (.getKeyCode e))]
-                                          (println n)
-                                          (s/sctl synth :note n)))])]
-    (add-node :name id :synth synth :output "freq" :out-type :control :cent t)))
+        t (text :text "" :columns 1)
+        f (fn [] (let [synth (s/midi-in)]
+                  (config! t :listen [:key-pressed (fn [e]
+                                                     (let [n (min 127 (.getKeyCode e))]
+                                                       (println n)
+                                                       (s/sctl synth :note n)))])
+                  synth))]
+    (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
 (defn piano-in [e]
   (let [id (get-id "piano-in" e)
@@ -332,67 +344,6 @@ Connections are references to two connection points
         s (slider :value 0 :min 0 :max 100 :orientation :vertical)]
     (add-node :name id :synth s :output "val" :out-type :manual :cent s)))
 
-(defn sound-on [e]
-  (s/svolume (:master-vol @s-panel)))
-(defn sound-off [e]
-  (s/svolume 0.0))
-
-
-(defn make-panel []
-  (xyz-panel
-    :paint draw-grid
-    :id :xyz
-    :background "#222222"
-    :items []
-    ))
-
-(defn fr []
-  (let [p (make-panel)]
-    (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
-    (frame
-     :menubar (menubar :items [(menu :text "File"
-                                     :items [(action :handler sound-on :name "Sound On")
-                                             (action :handler sound-off :name "Sound Off")
-                                             (action :handler dispose! :name "Exit")])
-                               (menu :text "New Control"
-                                     :items [(action :handler saw-osc :name "Saw Osc")
-                                             (action :handler square-osc :name "Square Osc")
-                                             (action :handler sin-osc :name "Sin Osc")
-                                             (action :handler sin-vco :name "Sin VCO")
-                                             (action :handler const :name "Const")
-                                             (action :handler midi-in :name "Midi In")
-                                             (action :handler note-in :name "Note In")
-                                             (action :handler piano-in :name "Piano In")
-                                             (action :handler lp-filt :name "LP Filt")
-                                             (action :handler hp-filt :name "HP Filt")
-                                             (action :handler moog-filt :name "Moog Filt")
-                                             (action :handler freeverb :name "Freeverb")
-                                             (action :handler echo :name "Echo")
-                                             (action :handler amp :name "Amp")
-                                             (action :handler pct-add :name "Pct Add")
-                                             (action :handler slider-ctl :name "Slider")
-                                             (action :handler c-splitter :name "Control Splitter")
-                                             (action :handler a-splitter :name "Audio Splitter")
-                                             (action :handler audio-out :name "Audio out")
-                                             ])])
-     :title   "Overtone Modular Synth"
-     :content (border-panel
-               :vgap 5
-               :center p)
-     :size    [600 :by 600])))
-
-(defn bugger-what!
-  "for some reason, makes the frame show full size"
-  [f]
-  (if (= (java.awt.Dimension.) (.getSize f))
-    (pack! f)
-    f))
-
-(defn -main [& args]
-  (let [f (invoke-now (fr))]
-    (swap! s-panel assoc :frame f)
-    (config! f :on-close :dispose)
-    (-> f bugger-what! show!)))
 
 ;;
 ;;(def f (-main))              ; create frame
@@ -487,6 +438,26 @@ Connections are references to two connection points
     (map #(keyword %) (distinct l))))
 
 
+(defn build-synths-and-connections
+  [ordered-nodes connections f]
+  (swap! s-panel assoc :run-mode true)
+  (doseq [n1 ordered-nodes]
+    (let [node (get @nodes n1)
+          synth ((:play-fn node))
+          node1 (assoc node :synth synth)]
+      (swap! nodes assoc n1 node1)))
+  (doseq [[n1 n2] connections]
+    (let [node1 (restore-node n1 @nodes f)
+          node2 (restore-node n2 @nodes f)]
+      (make-connection n1 node1 n2 node2)
+      (swap! s-panel assoc :last-point n2))))
+
+(defn kill-running-synths [ordered-nodes]
+  (doseq [n1 ordered-nodes]
+    (let [node (get @nodes n1)
+          synth ((:play-fn node))]
+      (s/skill synth))))
+
 (defn restore
   "usage: (restore (load-file fff.clj))
 
@@ -516,11 +487,7 @@ Connections are references to two connection points
                           y (:y n)]
                       (println n s wname wnum x y)
                       [(:w n) (make-node wname wnum x y)]))))]
-    (doseq [[n1 n2] (:connections r)]
-      (let [node1 (restore-node n1 m f)
-            node2 (restore-node n2 m f)]
-        (make-connection n1 node1 n2 node2)
-        (swap! s-panel assoc :last-point n2))))
+    (build-synths-and-connections o (:connections r) f))
   (sound-on 0))
 
 ;; (defn test-modsynth []
@@ -534,3 +501,69 @@ Connections are references to two connection points
 ;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
 ;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
 ;;     (swap! connections conj [mnode onode])))
+
+(defn sound-on [e]
+  (s/svolume (:master-vol @s-panel))
+  (build-synths-and-connections (get-order @connections) @connections (:frame @s-panel)))
+(defn sound-off [e]
+  (kill-running-synths (reverse (get-order @connections)))
+  (swap! s-panel assoc :run-mode false)
+  (s/svolume 0.0))
+
+
+(defn make-panel []
+  (xyz-panel
+    :paint draw-grid
+    :id :xyz
+    :background "#222222"
+    :items []
+    ))
+
+(defn fr []
+  (let [p (make-panel)]
+    (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
+    (frame
+     :menubar (menubar :items [(menu :text "File"
+                                     :items [(action :handler sound-on :name "Sound On")
+                                             (action :handler sound-off :name "Sound Off")
+                                             (action :handler dispose! :name "Exit")])
+                               (menu :text "New Control"
+                                     :items [(action :handler saw-osc :name "Saw Osc")
+                                             (action :handler square-osc :name "Square Osc")
+                                             (action :handler sin-osc :name "Sin Osc")
+                                             (action :handler sin-vco :name "Sin VCO")
+                                             (action :handler const :name "Const")
+                                             (action :handler midi-in :name "Midi In")
+                                             (action :handler note-in :name "Note In")
+                                             (action :handler piano-in :name "Piano In")
+                                             (action :handler lp-filt :name "LP Filt")
+                                             (action :handler hp-filt :name "HP Filt")
+                                             (action :handler moog-filt :name "Moog Filt")
+                                             (action :handler freeverb :name "Freeverb")
+                                             (action :handler echo :name "Echo")
+                                             (action :handler amp :name "Amp")
+                                             (action :handler pct-add :name "Pct Add")
+                                             (action :handler slider-ctl :name "Slider")
+                                             (action :handler c-splitter :name "Control Splitter")
+                                             (action :handler a-splitter :name "Audio Splitter")
+                                             (action :handler audio-out :name "Audio out")
+                                             ])])
+     :title   "Overtone Modular Synth"
+     :content (border-panel
+               :vgap 5
+               :center p)
+     :size    [600 :by 600])))
+
+(defn bugger-what!
+  "for some reason, makes the frame show full size"
+  [f]
+  (if (= (java.awt.Dimension.) (.getSize f))
+    (pack! f)
+    f))
+
+(defn -main [& args]
+  (let [f (invoke-now (fr))]
+    (swap! s-panel assoc :frame f)
+    (swap! s-panel assoc :run-mode false)
+    (config! f :on-close :dispose)
+    (-> f bugger-what! show!)))
