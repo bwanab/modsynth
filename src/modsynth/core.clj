@@ -9,7 +9,7 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns modsynth.core
-  (:use [seesaw core border behave graphics]
+  (:use [seesaw core border behave graphics color]
         [modsynth.piano]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
@@ -171,17 +171,23 @@
                     (s/sctl c :val val)))))
     synth))
 
+(defn connected?
+  [lid wid]
+  (not (empty? (filter #(= % [lid wid]) @connections))))
+
 (defn make-connection
   [lid lpoint wid wpoint]
-  (when (not= lid wid) ; don't connect inputs to outputs of same node
-    (if (:run-mode @s-panel)
-      (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
-            (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
-            :else
-            (let [c (connect-points lpoint wpoint)]
-              (swap! busses assoc (:name c) c))))
-    (swap! connections conj [lid wid])
-    (swap! s-panel assoc :last-point  nil)))
+  (if (connected? lid wid)
+    (reset! connections (filter #(not= % [lid wid]) @connections))
+    (when (not= lid wid)   ; don't connect inputs to outputs of same node
+     (if (:run-mode @s-panel)
+       (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
+             (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
+             :else
+             (let [c (connect-points lpoint wpoint)]
+               (swap! busses assoc (:name c) c))))
+     (swap! connections conj [lid wid])
+     (swap! s-panel assoc :last-point  nil))))
 
 "
 Each element on the screen is a node. Each node represents a visual widget and a synth or a manual controller like a slider. Every node
@@ -218,8 +224,14 @@ Connections are references to two connection points
                 (fn [e]
                   (if-let [lid (:last-point @s-panel)]
                     (let [lpoint (get @points lid)]
-                      (make-connection lid lpoint wid wpoint))
-                    (swap! s-panel assoc :last-point wid))))))
+                      (make-connection lid lpoint wid wpoint)
+                      (let [lp (:point lpoint)
+                            bc (default-color "Button.background")]
+                        (println "lp = " lp " bc = " bc)
+                        (config! lp :background bc)))
+                    (do
+                      (swap! s-panel assoc :last-point wid)
+                      (config! b :background :blue)))))))
     (config! (:panel @s-panel)
              :items (conj (config (:panel @s-panel) :items)
                           (:widget node)))
