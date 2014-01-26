@@ -100,7 +100,7 @@
 
 (defn make-io
   [io t node-id otype]
-  (println t otype)
+  ;;(println t otype)
   (if (= otype :split) ; special case code for splitter
     (if (= t :input)
       [(button :text "in" :class t :id (str node-id "-in"))]
@@ -153,11 +153,11 @@
         mn (:min p)
         mx (:max p)
         df (:default p)]
-    (println "from=" from)
-    (println "to=" to)
-    (println "name=" name)
-    (println "from-synth=" from-synth)
-    (println "to-synth=" to-synth)
+    ;; (println "from=" from)
+    ;; (println "to=" to)
+    ;; (println "name=" name)
+    ;; (println "from-synth=" from-synth)
+    ;; (println "to-synth=" to-synth)
     (config! from-synth :min mn :max mx :value df :paint-labels? true :paint-ticks? true)
     (listen from-synth :change (fn [e] (s/sctl to-synth t (value from-synth))))))
 
@@ -171,23 +171,33 @@
                     (s/sctl c :val val)))))
     synth))
 
+(defn get-node-name [node-name]
+  (let [nname (if (keyword? node-name) (name node-name) node-name)
+        s (str/split nname #":")
+        n (str/split (second s) #"-")]
+    (str (first s) ":" (first n))))
+
 (defn connected?
   [lid wid]
   (not (empty? (filter #(= % [lid wid]) @connections))))
 
 (defn make-connection
   [lid lpoint wid wpoint]
-  (if (connected? lid wid)
-    (reset! connections (filter #(not= % [lid wid]) @connections))
-    (when (not= lid wid)   ; don't connect inputs to outputs of same node
-     (if (:run-mode @s-panel)
-       (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
-             (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
-             :else
-             (let [c (connect-points lpoint wpoint)]
-               (swap! busses assoc (:name c) c))))
-     (swap! connections conj [lid wid])
-     (swap! s-panel assoc :last-point  nil))))
+  ;;(println "lid = " lid " wid = " wid)
+  (cond ;; if the two points are connected, disconnect them.
+   (connected? lid wid) (reset! connections (filter #(not= % [lid wid]) @connections))
+   (connected? wid lid) (reset! connections (filter #(not= % [wid lid]) @connections))
+   :else (let [lpn (get-node-name lid)
+               wpn (get-node-name wid)]
+           (when (not= lpn wpn) ; don't connect points of same node
+            (if (:run-mode @s-panel)
+              (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
+                    (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
+                    :else
+                    (let [c (connect-points lpoint wpoint)]
+                      (swap! busses assoc (:name c) c))))
+            (swap! connections conj [lid wid]))))
+  (swap! s-panel assoc :last-point  nil))
 
 "
 Each element on the screen is a node. Each node represents a visual widget and a synth or a manual controller like a slider. Every node
@@ -214,7 +224,7 @@ Connections are references to two connection points
                                    (config! :bounds :preferred)
                                    movable)
                     :id kw :inputs ins :outputs outs)]
-    (println "add node " id)
+    ;;(println "add node " id)
     (swap! nodes assoc kw node)
     (doseq [b (concat ins outs)]
       (let [wpoint {:point b :node node}
@@ -227,7 +237,7 @@ Connections are references to two connection points
                       (make-connection lid lpoint wid wpoint)
                       (let [lp (:point lpoint)
                             bc (default-color "Button.background")]
-                        (println "lp = " lp " bc = " bc)
+                        ;;(println "lp = " lp " bc = " bc)
                         (config! lp :background bc)))
                     (do
                       (swap! s-panel assoc :last-point wid)
@@ -395,23 +405,11 @@ Connections are references to two connection points
 (defn make-node [ntype id x y]
   (let [s (str "(" ntype " " id ")")
         m (load-string s)]
-    (println "s = " s)
+    ;;(println "s = " s)
     (move! (:widget m) :by [x y])
     m))
 
-(defn get-node-name [node-name]
-  (let [s (str/split node-name #":")
-        n (str/split (second s) #"-")]
-    (str (first s) ":" (first n))))
 
-(defn ms-reset! []
-  (sound-off 0)
-  (reset! connections [])
-  (reset! points {})
-  (reset! nodes {})
-  (reset! busses {})
-  (reset! next-id 0)
-  )
 
 (defn restore-node
   [n node-map frame]
@@ -433,15 +431,15 @@ Connections are references to two connection points
   "n is (:connections (load-file xxx.clj))"
   [n]
   (let [cn (for [[f t] n]
-             [(get-node-name (name f)) (get-node-name (name t))])
+             [(get-node-name f) (get-node-name t)])
         tos (into #{} (for [[f t] cn] t))]
     (filter #(not (contains? tos %)) (for [[f t] cn] f))))
 
 (defn get-chain [s1 n]
-  (let [[neighbors others] (partition-with #(= s1 (get-node-name (name (first %)))) n)]
+  (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
     (if (empty? neighbors)
       s1
-      [s1 (for [[f t] neighbors] (get-chain (get-node-name (name t)) others))])))
+      [s1 (for [[f t] neighbors] (get-chain (get-node-name t) others))])))
 
 (defn get-order [n]
   (let [s (get-starts n)
@@ -470,38 +468,6 @@ Connections are references to two connection points
           synth ((:play-fn node))]
       (s/skill synth))))
 
-(defn restore
-  "usage: (restore (load-file fff.clj))
-
-   strangely, it matters what order the nodes are created in. My best
-   guess, which seems to work is that they need to more or less be added
-   from source to sink. So starting with the freq gens, to the oscillators,
-   filters to the audio out. I don't know why this is true
-
-   TODO: What I really need to do is have an edit mode so the user can put the
-   nodes on the canvas in any order, then when the sound-on is hit, create
-   the synths in the right order irrespective of how the user put them in.
-"
-  [r]
-  (ms-reset!)
-  (swap! s-panel assoc :master-vol (:master-vol r))
-  (let [f (-main)
-        o (get-order (:connections r))
-        node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
-        m (apply hash-map
-                 (flatten
-                  (for [n1 o]
-                    (let [n (get node-map n1)
-                          s (str/split (name (:w n)) #":")
-                          wname (first s)
-                          wnum  (second s)
-                          x (:x n)
-                          y (:y n)]
-                      (println n s wname wnum x y)
-                      [(:w n) (make-node wname wnum x y)]))))]
-    (build-synths-and-connections o (:connections r) f))
-  (sound-on 0))
-
 ;; (defn test-modsynth []
 ;;   (let [f (-main)
 ;;         m (make-node "midi-in" 50 50)
@@ -521,6 +487,16 @@ Connections are references to two connection points
   (kill-running-synths (reverse (get-order @connections)))
   (swap! s-panel assoc :run-mode false)
   (s/svolume 0.0))
+
+(defn ms-reset! []
+  (sound-off 0)
+  (reset! connections [])
+  (reset! points {})
+  (reset! nodes {})
+  (reset! busses {})
+  (reset! next-id 0)
+  )
+
 
 
 (defn make-panel []
@@ -579,3 +555,35 @@ Connections are references to two connection points
     (swap! s-panel assoc :run-mode false)
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
+
+(defn restore
+  "usage: (restore (load-file fff.clj))
+
+   strangely, it matters what order the nodes are created in. My best
+   guess, which seems to work is that they need to more or less be added
+   from source to sink. So starting with the freq gens, to the oscillators,
+   filters to the audio out. I don't know why this is true
+
+   TODO: What I really need to do is have an edit mode so the user can put the
+   nodes on the canvas in any order, then when the sound-on is hit, create
+   the synths in the right order irrespective of how the user put them in.
+"
+  [r]
+  (ms-reset!)
+  (swap! s-panel assoc :master-vol (:master-vol r))
+  (let [f (-main)
+        o (get-order (:connections r))
+        node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
+        m (apply hash-map
+                 (flatten
+                  (for [n1 o]
+                    (let [n (get node-map n1)
+                          s (str/split (name (:w n)) #":")
+                          wname (first s)
+                          wnum  (second s)
+                          x (:x n)
+                          y (:y n)]
+                      ;;(println n s wname wnum x y)
+                      [(:w n) (make-node wname wnum x y)]))))]
+    (build-synths-and-connections o (:connections r) f))
+  (sound-on 0))
