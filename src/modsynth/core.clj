@@ -449,7 +449,7 @@ Connections are references to two connection points
 
 
 (defn build-synths-and-connections
-  [ordered-nodes connections f]
+  [ordered-nodes connections f make-new-connections]
   (swap! s-panel assoc :run-mode true)
   (doseq [n1 ordered-nodes]
     (let [node (get @nodes n1)
@@ -459,8 +459,12 @@ Connections are references to two connection points
   (doseq [[n1 n2] connections]
     (let [node1 (restore-node n1 @nodes f)
           node2 (restore-node n2 @nodes f)]
-      (make-connection n1 node1 n2 node2)
-      (swap! s-panel assoc :last-point n2))))
+      (if make-new-connections
+          (do
+            (make-connection n1 node1 n2 node2)
+            (swap! s-panel assoc :last-point n2))
+          (let [c (connect-points node1 node2)]
+            (swap! busses assoc (:name c) c))))))
 
 (defn kill-running-synths [ordered-nodes]
   (doseq [n1 ordered-nodes]
@@ -482,7 +486,8 @@ Connections are references to two connection points
 
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel))
-  (build-synths-and-connections (get-order @connections) @connections (:frame @s-panel)))
+  (build-synths-and-connections (get-order @connections) @connections (:frame @s-panel) false))
+
 (defn sound-off [e]
   (kill-running-synths (reverse (get-order @connections)))
   (swap! s-panel assoc :run-mode false)
@@ -585,5 +590,5 @@ Connections are references to two connection points
                           y (:y n)]
                       ;;(println n s wname wnum x y)
                       [(:w n) (make-node wname wnum x y)]))))]
-    (build-synths-and-connections o (:connections r) f))
+    (build-synths-and-connections o (:connections r) f true))
   (sound-on 0))
