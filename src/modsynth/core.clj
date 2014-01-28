@@ -335,8 +335,11 @@ Connections are references to two connection points
 
 (defn const [e]
   (let [id (get-id "const" e)
-        t (text :text "     " :columns 5)
-        f (fn [] (let [synth (s/const)]
+        t (text :text "     " :columns 5 :id (str id "-text"))
+        f (fn [] (let [synth (s/const)
+                      v (text t)]
+                  (if (not (empty? (str/trim v)))
+                    (s/sctl synth :ibus (read-string v)))
                   (config! t :listen [:action (fn [e] (s/sctl synth :ibus (read-string (text t))))])
                   synth))]
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
@@ -384,11 +387,26 @@ Connections are references to two connection points
 (defn to-string [e]
   (write e :stream nil :pretty false))
 
+(defn get-value-field
+  [w kw]
+  (select w [(keyword (str "#" (name kw) "-text"))]))
+
+(defn get-if-value
+  [w kw]
+  (if-let [vw (get-value-field w kw)]
+    (read-string (config vw :text))
+    nil))
+
 (defn dump-nodes []
   (map (fn [e]
          (let [w (:widget e)
-               l (config w :location)]
-           {:x (.getX l) :y (.getY l) :w (config w :id)}))
+               l (config w :location)
+               kw (config w :id)
+               rv {:x (.getX l) :y (.getY l) :w kw}
+               v (if-let [vw (get-if-value w kw)]
+                   (assoc rv :v vw)
+                   rv)]
+           v))
        (vals @nodes)))
 
 (defn dump-synth [s]
@@ -402,10 +420,13 @@ Connections are references to two connection points
    :connections (symbol (str "'" (to-string (dump-connections))))
    :master-vol (:master-vol @s-panel)})
 
-(defn make-node [ntype id x y]
+(defn make-node [ntype id x y v]
   (let [s (str "(" ntype " " id ")")
-        m (load-string s)]
-    ;;(println "s = " s)
+        m (load-string s)
+        w (:widget m)
+        kw (config w :id)]
+    (if-let [vw (get-value-field w kw)]
+      (config! vw :text v))
     (move! (:widget m) :by [x y])
     m))
 
@@ -587,8 +608,9 @@ Connections are references to two connection points
                           wname (first s)
                           wnum  (second s)
                           x (:x n)
-                          y (:y n)]
+                          y (:y n)
+                          v (:v n)]
                       ;;(println n s wname wnum x y)
-                      [(:w n) (make-node wname wnum x y)]))))]
+                      [(:w n) (make-node wname wnum x y v)]))))]
     (build-synths-and-connections o (:connections r) f true))
   (sound-on 0))
