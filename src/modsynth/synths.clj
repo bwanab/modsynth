@@ -45,6 +45,26 @@
     (out ob1 input)
     (out ob2 input)))
 
+(defsynth a-mixer-2
+  [obus OB
+   in1 B1
+   in2 B2]
+  (let [input1 (in:ar in1 1)
+        input2 (in:ar in2 1)]
+    (out obus (+ input1 input2))))
+
+(defsynth a-mixer-4
+  [obus OB
+   in1 B1
+   in2 B2
+   in3 B3
+   in4 B4]
+  (let [input1 (in:ar in1 1)
+        input2 (in:ar in2 1)
+        input3 (in:ar in3 1)
+        input4 (in:ar in4 1)]
+    (out obus (+ input1 input2 input3 input4))))
+
 (defsynth const
   [obus OB
    ibus 0]

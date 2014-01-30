@@ -217,7 +217,7 @@ Connections are references to two connection points
         node (assoc io :widget (doto (border-panel :id id
                                            :border (line-border :top 1 :color "#AAFFFF")
                                            :north (label :text id :background "#AAFFFF" :h-text-position :center)
-                                           :center (if (= nil (:cent io)) (label id) (:cent io))
+                                           :center (if (= nil (:cent io)) (label "") (:cent io))
                                            :east (grid-panel :rows (count outs) :columns 1 :items outs)
                                            :west (grid-panel :rows (count ins) :columns 1 :items ins)
                                            )
@@ -333,6 +333,16 @@ Connections are references to two connection points
         f (fn [] (make-synth s/a-splitter))]
     (add-node :name id :play-fn f :output :split :out-type :audio :synth-type s/a-splitter)))
 
+(defn a-mixer-2 [e]
+  (let [id (get-id "a-mixer-2" e)
+        f (fn [] (make-synth s/a-mixer-2))]
+    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-2)))
+
+(defn a-mixer-4 [e]
+  (let [id (get-id "a-mixer-4" e)
+        f (fn [] (make-synth s/a-mixer-4))]
+    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-4)))
+
 (defn const [e]
   (let [id (get-id "const" e)
         t (text :text "     " :columns 5 :id (str id "-text"))
@@ -433,11 +443,11 @@ Connections are references to two connection points
 
 
 (defn restore-node
-  [n node-map frame]
+  [n node-map]
   (let [name (name n)
         k (keyword (get-node-name name))
         m (get node-map k)
-        b (select frame [(keyword (str "#" name))])]
+        b (select (:widget m) [(keyword (str "#" name))])]
     {:point b :node m}))
 
 (defn partition-with
@@ -470,7 +480,7 @@ Connections are references to two connection points
 
 
 (defn build-synths-and-connections
-  [ordered-nodes connections f make-new-connections]
+  [ordered-nodes connections make-new-connections]
   (swap! s-panel assoc :run-mode true)
   (doseq [n1 ordered-nodes]
     (let [node (get @nodes n1)
@@ -478,8 +488,8 @@ Connections are references to two connection points
           node1 (assoc node :synth synth)]
       (swap! nodes assoc n1 node1)))
   (doseq [[n1 n2] connections]
-    (let [node1 (restore-node n1 @nodes f)
-          node2 (restore-node n2 @nodes f)]
+    (let [node1 (restore-node n1 @nodes)
+          node2 (restore-node n2 @nodes)]
       (if make-new-connections
           (do
             (make-connection n1 node1 n2 node2)
@@ -507,7 +517,7 @@ Connections are references to two connection points
 
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel))
-  (build-synths-and-connections (get-order @connections) @connections (:frame @s-panel) false))
+  (build-synths-and-connections (get-order @connections) @connections false))
 
 (defn sound-off [e]
   (kill-running-synths (reverse (get-order @connections)))
@@ -560,6 +570,8 @@ Connections are references to two connection points
                                              (action :handler slider-ctl :name "Slider")
                                              (action :handler c-splitter :name "Control Splitter")
                                              (action :handler a-splitter :name "Audio Splitter")
+                                             (action :handler a-mixer-2 :name "2 Ch mixer")
+                                             (action :handler a-mixer-4 :name "4 Ch mixer")
                                              (action :handler audio-out :name "Audio out")
                                              ])])
      :title   "Overtone Modular Synth"
@@ -612,5 +624,6 @@ Connections are references to two connection points
                           v (:v n)]
                       ;;(println n s wname wnum x y)
                       [(:w n) (make-node wname wnum x y v)]))))]
-    (build-synths-and-connections o (:connections r) f true))
-  (sound-on 0))
+    (build-synths-and-connections o (:connections r) true))
+  (sound-off 0)
+  (swap! s-panel assoc :last-point  nil))
