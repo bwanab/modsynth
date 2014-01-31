@@ -481,12 +481,14 @@ Connections are references to two connection points
 
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
-  (swap! s-panel assoc :run-mode true)
-  (doseq [n1 ordered-nodes]
-    (let [node (get @nodes n1)
-          synth ((:play-fn node))
-          node1 (assoc node :synth synth)]
-      (swap! nodes assoc n1 node1)))
+  ;;(swap! s-panel assoc :run-mode true)
+  (when (:run-mode @s-panel)
+    (doseq [n1 ordered-nodes]
+      (let [node (get @nodes n1)
+            synth ((:play-fn node))
+            node1 (assoc node :synth synth)]
+        (println "build synth " synth)
+        (swap! nodes assoc n1 node1))))
   (doseq [[n1 n2] connections]
     (let [node1 (restore-node n1 @nodes)
           node2 (restore-node n2 @nodes)]
@@ -517,6 +519,7 @@ Connections are references to two connection points
 
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel))
+  (swap! s-panel assoc :run-mode true)
   (build-synths-and-connections (get-order @connections) @connections false))
 
 (defn sound-off [e]
@@ -612,18 +615,18 @@ Connections are references to two connection points
   (let [f (-main)
         o (get-order (:connections r))
         node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
-        m (apply hash-map
-                 (flatten
-                  (for [n1 o]
-                    (let [n (get node-map n1)
-                          s (str/split (name (:w n)) #":")
-                          wname (first s)
-                          wnum  (second s)
-                          x (:x n)
-                          y (:y n)
-                          v (:v n)]
-                      ;;(println n s wname wnum x y)
-                      [(:w n) (make-node wname wnum x y v)]))))]
-    (build-synths-and-connections o (:connections r) true))
+        m (into {}
+           (for [n1 o]
+             (let [n (get node-map n1)
+                   s (str/split (name (:w n)) #":")
+                   wname (first s)
+                   wnum  (second s)
+                   x (:x n)
+                   y (:y n)
+                   v (:v n)]
+               ;;(println n s wname wnum x y)
+               [(:w n) (make-node wname wnum x y v)])))]
+    (build-synths-and-connections o (:connections r) true)
+    )
   (sound-off 0)
   (swap! s-panel assoc :last-point  nil))
