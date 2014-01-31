@@ -483,15 +483,16 @@ Connections are references to two connection points
     (map #(keyword %) (distinct l))))
 
 
-(defn build-synths-and-connections
-  [ordered-nodes connections make-new-connections]
-  ;;(swap! s-panel assoc :run-mode true)
-  (when (:run-mode @s-panel)
-    (doseq [n1 ordered-nodes]
+(defn instantiate-synths
+  [ordered-nodes]
+  (doseq [n1 ordered-nodes]
       (let [node (get @nodes n1)
             synth ((:play-fn node))
             node1 (conj node synth)]
         (swap! nodes assoc n1 node1))))
+
+(defn build-synths-and-connections
+  [ordered-nodes connections make-new-connections]
   (doseq [[n1 n2] connections]
     (let [node1 (restore-node n1 @nodes)
           node2 (restore-node n2 @nodes)]
@@ -524,7 +525,9 @@ Connections are references to two connection points
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel))
   (swap! s-panel assoc :run-mode true)
-  (build-synths-and-connections (get-order @connections) @connections false))
+  (let [ordered-nodes (get-order @connections)]
+    (instantiate-synths ordered-nodes)
+    (build-synths-and-connections ordered-nodes @connections false)))
 
 (defn sound-off [e]
   (kill-running-synths (reverse (get-order @connections)))
