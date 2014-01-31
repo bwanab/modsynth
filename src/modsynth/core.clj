@@ -169,7 +169,7 @@
         (when val (do
                     (s/connect-points c s :control (:keyword p))
                     (s/sctl c :val val)))))
-    synth))
+    {:synth synth}))
 
 (defn get-node-name [node-name]
   (let [nname (if (keyword? node-name) (name node-name) node-name)
@@ -250,6 +250,10 @@ Connections are references to two connection points
 (defn get-id [t e]
   (let [id (if (number? e) e (swap! next-id inc))]
     (str t ":" id)))
+
+(defn kill-synth [n]
+  (if-let [synth (:synth n)]
+    (s/skill synth)))
 
 (defn- osc [name synth-type]
   (let [f (fn [] (make-synth synth-type))]
@@ -347,23 +351,23 @@ Connections are references to two connection points
   (let [id (get-id "const" e)
         t (text :text "     " :columns 5 :id (str id "-text"))
         f (fn [] (let [synth (s/const)
-                      v (text t)]
+                      v (text t)
+                      unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
                   (if (not (empty? (str/trim v)))
                     (s/sctl synth :ibus (read-string v)))
-                  (config! t :listen [:action (fn [e] (s/sctl synth :ibus (read-string (text t))))])
-                  synth))]
+                  {:synth synth :stop-fn unregister}))]
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
               :cent t)))
 
 (defn midi-in [e]
   (let [id (get-id "midi-in" e)
         t (text :text "" :columns 1)
-        f (fn [] (let [synth (s/midi-in)]
-                  (config! t :listen [:key-pressed (fn [e]
-                                                     (let [n (min 127 (.getKeyCode e))]
-                                                       (println n)
-                                                       (s/sctl synth :note n)))])
-                  synth))]
+        f (fn [] (let [synth (s/midi-in)
+                      unregister (listen t :key-pressed (fn [e]
+                                           (let [n (min 127 (.getKeyCode e))]
+                                             (println n)
+                                             (s/sctl synth :note n))))]
+                  {:synth synth :stop-fn unregister}))]
     (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
 (defn piano-in [e]
@@ -486,8 +490,7 @@ Connections are references to two connection points
     (doseq [n1 ordered-nodes]
       (let [node (get @nodes n1)
             synth ((:play-fn node))
-            node1 (assoc node :synth synth)]
-        (println "build synth " synth)
+            node1 (conj node synth)]
         (swap! nodes assoc n1 node1))))
   (doseq [[n1 n2] connections]
     (let [node1 (restore-node n1 @nodes)
@@ -501,9 +504,10 @@ Connections are references to two connection points
 
 (defn kill-running-synths [ordered-nodes]
   (doseq [n1 ordered-nodes]
-    (let [node (get @nodes n1)
-          synth ((:play-fn node))]
-      (s/skill synth))))
+    (let [node (get @nodes n1)]
+      (kill-synth node)
+      (if-let [stop-fn (:stop-fn node)]
+        (stop-fn)))))
 
 ;; (defn test-modsynth []
 ;;   (let [f (-main)
@@ -528,15 +532,12 @@ Connections are references to two connection points
   (s/svolume 0.0))
 
 (defn ms-reset! []
-  (sound-off 0)
   (reset! connections [])
   (reset! points {})
   (reset! nodes {})
   (reset! busses {})
   (reset! next-id 0)
-  )
-
-
+  (sound-off 0))
 
 (defn make-panel []
   (xyz-panel
@@ -626,7 +627,5 @@ Connections are references to two connection points
                    v (:v n)]
                ;;(println n s wname wnum x y)
                [(:w n) (make-node wname wnum x y v)])))]
-    (build-synths-and-connections o (:connections r) true)
-    )
-  (sound-off 0)
+    (build-synths-and-connections o (:connections r) true))
   (swap! s-panel assoc :last-point  nil))
