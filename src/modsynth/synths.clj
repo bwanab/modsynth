@@ -76,6 +76,7 @@
   (let [freq (midicps note)]
     (out:kr obus freq)))
 
+
 (defsynth saw-osc
   [obus OB
    ibus IB]
@@ -156,6 +157,55 @@
   (let [sig (in:kr ibus 1)
         g (+ (* (in:kr gain 1) 0.01) 0.5)]
     (out obus (* sig g))))
+
+;; (defsynth adsr-env
+;;   [obus OB
+;;    ibus IB
+;;    attack  {:default B1 :def 0.1 :min 0 :max 100 :step 1}
+;;    decay   {:default B2 :def 10 :min 0 :max 100 :step 1}
+;;    sustain {:default B3 :def 60 :min 0 :max 100 :step 1}
+;;    release {:default B4 :def 30 :min 0 :max 100 :step 1}]
+;;   (let [sig (in:ar ibus 2)
+;;         ;; a (* 0.01 (in:kr attack 1))
+;;         ;; d (* 0.01 (in:kr decay 1))
+;;         ;; s (* 0.01 (in:kr sustain 1))
+;;         ;; r (* 0.01 (in:kr release 1))
+;;         ;; gate 1
+;;         ;; env (env-gen (adsr a d s r) :gate gate :action FREE)
+;;         ]
+;;     (out obus sig)))
+
+(defsynth adsr-env
+  [obus OB
+   ibus IB
+   attack  {:default B1 :def 0.1 :min 0 :max 100 :step 1}
+   decay   {:default B2 :def 10 :min 0 :max 100 :step 1}
+   sustain {:default B3 :def 60 :min 0 :max 100 :step 1}
+   release {:default B4 :def 30 :min 0 :max 100 :step 1}
+   gate 1
+   ]
+  (let [sig (in:ar ibus 2)
+        a (* (in:kr attack 1) 0.01)
+        d (* (in:kr decay 1) 0.01)
+        s (* (in:kr sustain 1) 0.01)
+        r (* (in:kr release 1) 0.01)
+        env (env-gen (adsr a d s r) gate)
+        ]
+    (out obus (* env sig))))
+
+(defsynth perc-env
+  [obus OB
+   ibus IB
+   attack  {:default B1 :def 0.1 :min 0 :max 100 :step 1}
+   release {:default B2 :def 30 :min 0 :max 100 :step 1}
+   gate 1
+   ]
+  (let [sig (in:ar ibus 2)
+        a (* (in:kr attack 1) 0.01)
+        r (* (in:kr release 1) 0.01)
+        env (env-gen (perc a r) gate)
+        ]
+    (out obus (* env sig))))
 
 (defsynth amp
   [obus OB

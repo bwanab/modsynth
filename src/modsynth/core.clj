@@ -13,7 +13,8 @@
         [modsynth.piano]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [overtone.core :refer [ctl volume kill at now]])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
@@ -23,6 +24,7 @@
 (def nodes (atom {}))
 (def points (atom {}))
 (def connections (atom []))
+(def gated-synths (atom #{}))
 (def busses (atom {}))
 
 (s/svolume 0.0)
@@ -96,12 +98,16 @@
     ))
 
 (defn get-synth-controls [s]
-  (filter #(not (contains? #{"obus" "ibus"} %)) (map :name (:params s))))
+  (filter #(not (contains? #{"obus" "ibus" "gate"} %)) (map :name (:params s))))
+
+(defn has-gate [s]
+  (let [f (filter #(contains? #{"gate"} %) (map :name (:params s)))]
+    (not (empty? f))))
 
 (defn make-io
   [io t node-id otype]
   ;;(println t otype)
-  (if (= otype :split) ; special case code for splitter
+  (if (= otype :split) ; special case code for splitters
     (if (= t :input)
       [(button :text "in" :class t :id (str node-id "-in"))]
       (for [c (get-synth-controls (:synth-type io))]
@@ -214,6 +220,7 @@ Connections are references to two connection points
         otype (:output io)
         ins  (make-io io :input id otype)
         outs  (make-io io :output id otype)
+        gated (has-gate (:synth-type io))
         node (assoc io :widget (doto (border-panel :id id
                                            :border (line-border :top 1 :color "#AAFFFF")
                                            :north (label :text id :background "#AAFFFF" :h-text-position :center)
@@ -223,7 +230,7 @@ Connections are references to two connection points
                                            )
                                    (config! :bounds :preferred)
                                    movable)
-                    :id kw :inputs ins :outputs outs)]
+                    :id kw :inputs ins :outputs outs :gated gated)]
     ;;(println "add node " id)
     (swap! nodes assoc kw node)
     (doseq [b (concat ins outs)]
@@ -307,6 +314,16 @@ Connections are references to two connection points
         f (fn [] (make-synth s/amp))]
     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
 
+(defn adsr-env [e]
+  (let [id (get-id "adsr-env" e)
+        f (fn [] (make-synth s/adsr-env))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/adsr-env) ))
+
+(defn perc-env [e]
+  (let [id (get-id "perc-env" e)
+        f (fn [] (make-synth s/perc-env))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/perc-env) ))
+
 (defn pct-add [e]
   (let [id (get-id "pct-add" e)
         f (fn [] (make-synth s/pct-add))]
@@ -359,6 +376,16 @@ Connections are references to two connection points
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
               :cent t)))
 
+(defn play-note [synth n]
+  (s/sctl synth :note n)
+  (doseq [gated-synth @gated-synths]
+    (s/sctl gated-synth :gate 0)
+    (at (+ (now) 50) (s/sctl gated-synth :gate 1))))
+
+(defn shut-gates []
+  (doseq [gated-synth @gated-synths]
+    (s/sctl gated-synth :gate 0)))
+
 (defn midi-in [e]
   (let [id (get-id "midi-in" e)
         t (text :text "" :columns 1)
@@ -366,17 +393,18 @@ Connections are references to two connection points
                       unregister (listen t :key-pressed (fn [e]
                                            (let [n (min 127 (.getKeyCode e))]
                                              (println n)
-                                             (s/sctl synth :note n))))]
+                                             (play-note synth n))))]
                   {:synth synth :stop-fn unregister}))]
     (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
 (defn piano-in [e]
   (let [id (get-id "piano-in" e)
-        synth (s/midi-in)
-        p (piano (fn [k] (s/sctl synth :note k))
-                 (fn [k] (s/sctl synth :note -1000)))]
-    (show! p)
-    (add-node :name id :synth synth :output "freq" :out-type :control)))
+        f (fn []  (let [synth (s/midi-in)
+                       p (piano (fn [k] (play-note synth k))
+                                (fn [k] (shut-gates)))]
+                   (show! p)
+                   {:synth synth}))]
+    (add-node :name id :play-fn f :output "freq" :out-type :control)))
 
 (defn slider-ctl [e]
   (let [id (get-id "slider-ctl" e)
@@ -467,8 +495,15 @@ Connections are references to two connection points
   [n]
   (let [cn (for [[f t] n]
              [(get-node-name f) (get-node-name t)])
-        tos (into #{} (for [[f t] cn] t))]
-    (filter #(not (contains? tos %)) (for [[f t] cn] f))))
+        tos (into #{} (for [[f t] cn] t))
+        m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
+
+    ;; we need the input nodes to be first in the chain
+    (sort (fn [x y] (if (.contains x "-in:")
+                     -1
+                     (if (.contains y "-in:")
+                       1
+                       (compare x y)))) m)))
 
 (defn get-chain [s1 n]
   (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
@@ -489,6 +524,8 @@ Connections are references to two connection points
       (let [node (get @nodes n1)
             synth ((:play-fn node))
             node1 (conj node synth)]
+        (if (:gated node)
+          (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
 (defn build-synths-and-connections
@@ -536,6 +573,7 @@ Connections are references to two connection points
 
 (defn ms-reset! []
   (reset! connections [])
+  (reset! gated-synths #{})
   (reset! points {})
   (reset! nodes {})
   (reset! busses {})
@@ -573,6 +611,8 @@ Connections are references to two connection points
                                              (action :handler freeverb :name "Freeverb")
                                              (action :handler echo :name "Echo")
                                              (action :handler amp :name "Amp")
+                                             (action :handler adsr-env :name "ADSR-Env")
+                                             (action :handler perc-env :name "Perc-Env")
                                              (action :handler pct-add :name "Pct Add")
                                              (action :handler slider-ctl :name "Slider")
                                              (action :handler c-splitter :name "Control Splitter")
@@ -595,6 +635,7 @@ Connections are references to two connection points
     f))
 
 (defn -main [& args]
+  (ms-reset!)
   (let [f (invoke-now (fr))]
     (swap! s-panel assoc :frame f)
     (swap! s-panel assoc :run-mode false)
