@@ -344,6 +344,11 @@ Connections are references to two connection points
         f (fn []  (make-synth s/audio-out))]
     (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-out)))
 
+(defn audio-in [e]
+  (let [id (get-id "audio-in" e)
+        f (fn []  (make-synth s/audio-in))]
+    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-in)))
+
 (defn c-splitter [e]
   (let [id (get-id "c-splitter" e)
         f (fn []  (make-synth s/c-splitter))]
@@ -431,7 +436,8 @@ Connections are references to two connection points
 
 (defn get-value-field
   [w kw]
-  (select w [(keyword (str "#" (name kw) "-text"))]))
+  (if-let [w (select w [(keyword (str "#" (name kw) "-text"))])]
+    (if (or (nil? w) (empty? (str/trim w))) nil w)))
 
 (defn get-if-value
   [w kw]
@@ -620,6 +626,7 @@ Connections are references to two connection points
                                              (action :handler a-mixer-2 :name "2 Ch mixer")
                                              (action :handler a-mixer-4 :name "4 Ch mixer")
                                              (action :handler audio-out :name "Audio out")
+                                             (action :handler audio-in :name "Audio in")
                                              ])])
      :title   "Overtone Modular Synth"
      :content (border-panel

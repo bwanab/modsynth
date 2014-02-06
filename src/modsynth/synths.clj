@@ -29,6 +29,11 @@
    b2 B2]
   (out obus [(in:ar b1 1) (in:ar b2 1) ]))
 
+(defsynth audio-in
+  [obus OB
+   ibus 0]
+  (out obus [(sound-in:ar ibus 2)]))
+
 (defsynth c-splitter
   [ob1 OB1
    ob2 OB2
