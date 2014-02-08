@@ -118,3 +118,11 @@
 ;; (scheduled-test (now) 1000 m0 56)
 ;; (def m1 (test1))
 ;; (scheduled-test (now) 1000 m1 56)
+
+(defsynth pantest2
+  [note 60
+   pos 0]
+  (let [freq (midicps note)
+        osc (saw freq)
+        p (pan2 osc pos)]
+    (out [0 1] p)))

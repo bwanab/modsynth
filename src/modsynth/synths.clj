@@ -43,12 +43,22 @@
     (out ob2 input)))
 
 (defsynth a-splitter
+  "pos is 0 full left 50 middle 100 full right
+   lev is 0 to 100"
   [ob1 OB1
    ob2 OB2
-   ibus IB]
-  (let [input (in:ar ibus 1)]
-    (out ob1 input)
-    (out ob2 input)))
+   ibus IB
+   pos {:default B1 :def 50 :max 100 :min 0 :step 1}
+   lev {:default B1 :def 50 :max 100 :min 0 :step 1}]
+  (let [input (in:ar ibus 1)
+        position (- (* (in:kr pos 1) 0.02) 1.0)
+        level (* (in:kr lev 1) 0.01)
+        ;;p (pan2 input position level)
+        ;; do it by hand instead of with pan2
+        tpos (+ 0.5 (* position 0.5))
+        ]
+    (out ob1 (* input level tpos))
+    (out ob2 (* input level (- 1 tpos)))))
 
 (defsynth a-mixer-2
   [obus OB

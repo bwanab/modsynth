@@ -104,13 +104,21 @@
   (let [f (filter #(contains? #{"gate"} %) (map :name (:params s)))]
     (not (empty? f))))
 
+(defn get-split-controls
+  [s t]
+  (if (= t :input)
+    (filter #(not (contains? #{"ob1" "ob2" "ibus"} %)) (map :name (:params s)))
+    (filter #(contains? #{"ob1" "ob2"} %) (map :name (:params s)))))
+
 (defn make-io
   [io t node-id otype]
   ;;(println t otype)
   (if (= otype :split) ; special case code for splitters
     (if (= t :input)
-      [(button :text "in" :class t :id (str node-id "-in"))]
-      (for [c (get-synth-controls (:synth-type io))]
+      (cons (button :text "in" :class t :id (str node-id "-in"))
+            (for [c (get-split-controls (:synth-type io) :input)]
+              (button :text c :class t :id (str node-id "-" c))))
+      (for [c (get-split-controls (:synth-type io) :output)]
         (button :text c :class t :id (str node-id "-" c))))
     (let [m (when-let [b (get io t)]
               (button :text b :class t :id (str node-id "-" b)))
@@ -168,6 +176,7 @@
     (listen from-synth :change (fn [e] (s/sctl to-synth t (value from-synth))))))
 
 (defn make-synth [s]
+  (println "make synth " (:name s))
   (let [synth (s)]
     (doseq [p (get-synth-controls s)]
       (let [c (s/const)
@@ -463,10 +472,17 @@ Connections are references to two connection points
 (defn dump-connections []
   @connections)
 
+(defn get-frame-dimension [f]
+  (let [d (.getSize f)
+        h (.getHeight d)
+        w (.getWidth d)]
+    {:height h :width w}))
+
 (defn dump-all []
   {:nodes (symbol (str "'" (to-string (dump-nodes))))
    :connections (symbol (str "'" (to-string (dump-connections))))
-   :master-vol (:master-vol @s-panel)})
+   :master-vol (:master-vol @s-panel)
+   :frame (get-frame-dimension (:frame @s-panel))})
 
 (defn make-node [ntype id x y v]
   (let [s (str "(" ntype " " id ")")
@@ -649,6 +665,10 @@ Connections are references to two connection points
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
 
+(defn set-frame-size [f d]
+  (when d
+    (.setSize f (java.awt.Dimension. (:width d) (:height d)))))
+
 (defn restore
   "usage: (restore (load-file fff.clj))
 
@@ -657,9 +677,6 @@ Connections are references to two connection points
    from source to sink. So starting with the freq gens, to the oscillators,
    filters to the audio out. I don't know why this is true
 
-   TODO: What I really need to do is have an edit mode so the user can put the
-   nodes on the canvas in any order, then when the sound-on is hit, create
-   the synths in the right order irrespective of how the user put them in.
 "
   [r]
   (ms-reset!)
@@ -678,5 +695,6 @@ Connections are references to two connection points
                    v (:v n)]
                ;;(println n s wname wnum x y)
                [(:w n) (make-node wname wnum x y v)])))]
-    (build-synths-and-connections o (:connections r) true))
+    (build-synths-and-connections o (:connections r) true)
+    (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil))
