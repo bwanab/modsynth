@@ -14,7 +14,8 @@
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
             [clojure.string :as str]
-            [overtone.core :refer [ctl volume kill at now]])
+            [overtone.core :refer [ctl volume kill at now]]
+            [overtone.studio.scope :refer [pscope]])
   (:import [javax.swing SwingUtilities]
            [java.awt Color]))
 
@@ -338,15 +339,25 @@ Connections are references to two connection points
         f (fn [] (make-synth s/pct-add))]
     (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
 
+(defn val-add [e]
+  (let [id (get-id "val-add" e)
+        f (fn [] (make-synth s/val-add))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/val-add) ))
+
 (defn sin-vco [e]
   (let [id (get-id "sin-vco" e)
         f (fn []  (make-synth s/sin-vco))]
     (add-node :name id :play-fn f :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
 
+(defn rand-val [e]
+  (let [id (get-id "rand-val" e)
+        f (fn []  (make-synth s/rand-val))]
+    (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-val)))
+
 (defn note-in [e]
   (let [id (get-id "note-in" e)
         f (fn []  (make-synth s/midi-in))]
-    (add-node :name id :play-fn f :input "note" :output "freq" :out-type :control :synth-type s/midi-in)))
+    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/midi-in)))
 
 (defn audio-out [e]
   (let [id (get-id "audio-out" e)
@@ -623,6 +634,7 @@ Connections are references to two connection points
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
                                              (action :handler sin-vco :name "Sin VCO")
+                                             (action :handler rand-val :name "Random Val")
                                              (action :handler const :name "Const")
                                              (action :handler midi-in :name "Midi In")
                                              (action :handler note-in :name "Note In")
@@ -636,6 +648,7 @@ Connections are references to two connection points
                                              (action :handler adsr-env :name "ADSR-Env")
                                              (action :handler perc-env :name "Perc-Env")
                                              (action :handler pct-add :name "Pct Add")
+                                             (action :handler val-add :name "Val Add")
                                              (action :handler slider-ctl :name "Slider")
                                              (action :handler c-splitter :name "Control Splitter")
                                              (action :handler a-splitter :name "Audio Splitter")

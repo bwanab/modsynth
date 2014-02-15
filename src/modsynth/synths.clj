@@ -110,6 +110,13 @@
    ibus IB]
   (out obus (* 50 (+ 1.0 (sin-osc:kr (in:kr ibus 1))))))
 
+(defsynth rand-val
+  [obus OB
+   lo {:default B1 :def 0 :min 0 :max 10000 :step 1}
+   hi {:default B1 :def 0 :min 0 :max 10000 :step 1}
+   trig {:default B1 :def 0 :min 0 :max 1 :step 1}]
+  (t-rand lo hi trig))
+
 ;; this is an abuse-of-sorts of the parameter system for defsynths. For
 ;; modsynth synths, the default has to be a unique bus number. The other
 ;; parameters give the range of the values that this bus should receive.
@@ -172,6 +179,13 @@
   (let [sig (in:kr ibus 1)
         g (+ (* (in:kr gain 1) 0.01) 0.5)]
     (out obus (* sig g))))
+
+(defsynth val-add
+  [obus OB
+   ibus IB
+   val  {:default B1 :def 0 :min 0 :max 100 :step :1}]
+  (let [sig (in:kr ibus 1)]
+    (out obus (+ sig (in:kr val 1)))))
 
 ;; (defsynth adsr-env
 ;;   [obus OB
