@@ -356,8 +356,8 @@ Connections are references to two connection points
 
 (defn note-in [e]
   (let [id (get-id "note-in" e)
-        f (fn []  (make-synth s/midi-in))]
-    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/midi-in)))
+        f (fn []  (make-synth s/note-in))]
+    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/note-in)))
 
 (defn audio-out [e]
   (let [id (get-id "audio-out" e)

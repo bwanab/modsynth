@@ -79,8 +79,8 @@
     (at (+ (now) delay) (ctl pe :gate 1))
     (apply-at new-t #'scheduled-test [new-t sep-t m (inc note) delay])))
 
-(def m (test2))
-(scheduled-test (now) 1000 m 56 50)
+;; (def m (test2))
+;; (scheduled-test (now) 1000 m 56 50)
 
 (definst ding
   [note 60 velocity 1 gate 1]
@@ -126,3 +126,38 @@
         osc (saw freq)
         p (pan2 osc pos)]
     (out [0 1] p)))
+
+(defsynth randtest
+  [cycle-freq 1
+   rt -1]
+  (let [vco (sin-osc:kr cycle-freq)
+        ;;vco rt
+        note (t-rand:kr 40 60 vco)
+        freq (midicps note)]
+    (do
+      (poll vco note "note: ")
+      (out 0 (saw freq)))))
+
+(defsynth sin-vco
+  "normalizes to output a sine wave that goes from 0 to 100"
+  [obus OB
+   cycle-freq 1]
+  (out obus (sin-osc:kr cycle-freq)))
+
+(defsynth randtest2
+  [ibus IB]
+  (let [vco (in:kr ibus 1)
+        note (t-rand:kr 40 60 vco)
+        freq (midicps note)]
+    (do
+      (poll vco note "note: ")
+      (out 0 (saw freq)))))
+
+(defn test3
+  "test t-rang getting trigger via bus"
+  []
+  (let [sv (sin-vco)
+        rn (randtest2)
+        b1 (control-bus 1)]
+    (ctl sv :obus b1)
+    (ctl rn :ibus b1)))

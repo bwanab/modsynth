@@ -91,6 +91,12 @@
   (let [freq (midicps note)]
     (out:kr obus freq)))
 
+(defsynth note-in
+  [obus OB
+   note IB]
+  (let [freq (midicps (in:kr note 1))]
+    (out:kr obus freq)))
+
 
 (defsynth saw-osc
   [obus OB
@@ -113,9 +119,12 @@
 (defsynth rand-val
   [obus OB
    lo {:default B1 :def 0 :min 0 :max 10000 :step 1}
-   hi {:default B1 :def 0 :min 0 :max 10000 :step 1}
-   trig {:default B1 :def 0 :min 0 :max 1 :step 1}]
-  (t-rand lo hi trig))
+   hi {:default B2 :def 0 :min 0 :max 10000 :step 1}
+   trig {:default B3 :def 0 :min 0 :max 1 :step 1}]
+  (let [low (in:kr lo 1)
+        high (in:kr hi 1)
+        trigger (in:kr trig 1)]
+   (out obus (t-rand:kr low high trigger))))
 
 ;; this is an abuse-of-sorts of the parameter system for defsynths. For
 ;; modsynth synths, the default has to be a unique bus number. The other
