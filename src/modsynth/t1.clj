@@ -127,16 +127,25 @@
         p (pan2 osc pos)]
     (out [0 1] p)))
 
+(defonce index-buffer
+  (let [buf (buffer 128)
+        data (take-while #(< % 100) (drop-while #(> % 30) (scale-field :a :pentatonic)))]
+    (doseq [[idx val] (map-indexed (fn [a b] [a b]) data)]
+      (buffer-set! buf idx val))
+    buf))
+
 (defsynth randtest
-  [cycle-freq 1
-   rt -1]
+  [cycle-freq 5
+   gate 1]
   (let [vco (sin-osc:kr cycle-freq)
-        ;;vco rt
-        note (t-rand:kr 40 60 vco)
-        freq (midicps note)]
+        idx (t-rand:kr 10 25 vco)
+        note (index:kr index-buffer idx)
+        freq (midicps note)
+        sig (saw freq)
+        env (env-gen (adsr 1 10 10 10) gate)]
     (do
       (poll vco note "note: ")
-      (out 0 (saw freq)))))
+      (out 0 (* env sig)))))
 
 (defsynth sin-vco
   "normalizes to output a sine wave that goes from 0 to 100"

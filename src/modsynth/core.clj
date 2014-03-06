@@ -349,10 +349,15 @@ Connections are references to two connection points
         f (fn []  (make-synth s/sin-vco))]
     (add-node :name id :play-fn f :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
 
-(defn rand-val [e]
-  (let [id (get-id "rand-val" e)
-        f (fn []  (make-synth s/rand-val))]
-    (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-val)))
+(defn rand-in [e]
+  (let [id (get-id "rand-in" e)
+        f (fn []  (make-synth s/rand-in))]
+    (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-in)))
+
+(defn rand-pent [e]
+  (let [id (get-id "rand-pent" e)
+        f (fn []  (make-synth s/rand-pent))]
+    (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
 
 (defn note-in [e]
   (let [id (get-id "note-in" e)
@@ -503,6 +508,7 @@ Connections are references to two connection points
     (if-let [vw (get-value-field w kw)]
       (config! vw :text v))
     (move! (:widget m) :by [x y])
+    (reset! next-id (max @next-id (load-string id)))
     m))
 
 
@@ -535,7 +541,7 @@ Connections are references to two connection points
     (sort (fn [x y] (if (.contains x "-in:")
                      -1
                      (if (.contains y "-in:")
-                       1
+                       -1
                        (compare x y)))) m)))
 
 (defn get-chain [s1 n]
@@ -563,15 +569,17 @@ Connections are references to two connection points
 
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
-  (doseq [[n1 n2] connections]
-    (let [node1 (restore-node n1 @nodes)
-          node2 (restore-node n2 @nodes)]
-      (if make-new-connections
-          (do
-            (make-connection n1 node1 n2 node2)
-            (swap! s-panel assoc :last-point n2))
-          (let [c (connect-points node1 node2)]
-            (swap! busses assoc (:name c) c))))))
+  (let [connection-map (into {}  (for [e connections] [(keyword (get-node-name (first e))) e]))]
+   (doseq [node ordered-nodes]
+     (if-let [[n1 n2] (get connection-map node) ]
+       (let [node1 (restore-node n1 @nodes)
+             node2 (restore-node n2 @nodes)]
+         (if make-new-connections
+           (do
+             (make-connection n1 node1 n2 node2)
+             (swap! s-panel assoc :last-point n2))
+           (let [c (connect-points node1 node2)]
+             (swap! busses assoc (:name c) c))))))))
 
 (defn kill-running-synths [ordered-nodes]
   (doseq [n1 ordered-nodes]
@@ -634,7 +642,8 @@ Connections are references to two connection points
                                              (action :handler square-osc :name "Square Osc")
                                              (action :handler sin-osc :name "Sin Osc")
                                              (action :handler sin-vco :name "Sin VCO")
-                                             (action :handler rand-val :name "Random Val")
+                                             (action :handler rand-in :name "Random Val")
+                                             (action :handler rand-pent :name "Random Pentatonic")
                                              (action :handler const :name "Const")
                                              (action :handler midi-in :name "Midi In")
                                              (action :handler note-in :name "Note In")
@@ -688,8 +697,9 @@ Connections are references to two connection points
    strangely, it matters what order the nodes are created in. My best
    guess, which seems to work is that they need to more or less be added
    from source to sink. So starting with the freq gens, to the oscillators,
-   filters to the audio out. I don't know why this is true
-
+   filters to the audio out. I don't know why this is true, but to make
+   it work, we attempt to work out the right order of node creation using
+   get-order on the connections.
 "
   [r]
   (ms-reset!)
@@ -706,7 +716,7 @@ Connections are references to two connection points
                    x (:x n)
                    y (:y n)
                    v (:v n)]
-               ;;(println n s wname wnum x y)
+               (println n s wname wnum x y)
                [(:w n) (make-node wname wnum x y v)])))]
     (build-synths-and-connections o (:connections r) true)
     (set-frame-size f (:frame r)))
