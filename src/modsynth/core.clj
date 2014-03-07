@@ -567,6 +567,19 @@ Connections are references to two connection points
           (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
+(defn find-all-paths
+  [connection-map starts]
+  (for [s starts]
+    (let [p (iterate (fn [e] (second ((keyword (get-node-name e)) connection-map))) s)]
+      (take-while #(not= nil %) p))))
+
+(defn find-longest-path
+  [connection-map starts]
+  (let [a (find-all-paths connection-map starts)
+        aa (map (fn [e] [(count e) e]) a)]
+    (second (reduce (fn [x y] (if (> (first x) (first y)) x y)) aa))))
+
+
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
   (let [connection-map (into {}  (for [e connections] [(keyword (get-node-name (first e))) e]))]
