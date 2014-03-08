@@ -522,7 +522,8 @@ Connections are references to two connection points
     {:point b :node m}))
 
 (defn partition-with
-  "partitions all elements to two buckets where first is pred is true, second is pred is false
+  "partitions all elements to two buckets where first contains elements in which pred is true
+   and the second contains the elements in which pred is false.
 
    this is how I always think of partition-by working, but it has a different behavior."
   [pred coll]
@@ -538,23 +539,25 @@ Connections are references to two connection points
         m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
 
     ;; we need the input nodes to be first in the chain
-    (sort (fn [x y] (if (.contains x "-in:")
-                     -1
-                     (if (.contains y "-in:")
-                       -1
-                       (compare x y)))) m)))
+    ;; (sort (fn [x y] (if (.contains x "-in:")
+    ;;                  -1
+    ;;                  (if (.contains y "-in:")
+    ;;                    -1
+    ;;                    (compare x y)))) m)
+    m))
 
-(defn get-chain [s1 n]
-  (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
-    (if (empty? neighbors)
-      s1
-      [s1 (for [[f t] neighbors] (get-chain (get-node-name t) others))])))
+;; (defn get-chain [s1 n]
+;;   (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
+;;     (if (empty? neighbors)
+;;       s1
+;;       [s1 (for [[f t] neighbors] (get-chain (get-node-name t) others))])))
 
-(defn get-order [n]
-  (let [s (get-starts n)
-        l (flatten (for [s1 s]
-                     (get-chain s1 n)))]
-    (map #(keyword %) (distinct l))))
+;; (defn get-order [n]
+;;   (let [s (get-starts n)
+;;         l (flatten (for [s1 s]
+;;                      (get-chain s1 n)))]
+;;     (map #(keyword %) (distinct l))))
+
 
 
 (defn instantiate-synths
@@ -567,22 +570,52 @@ Connections are references to two connection points
           (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
+(defn get-connection-map
+  [connections]
+  (into {}
+        (for [e connections]
+          [(keyword (get-node-name (first e))) e])))
+
 (defn find-all-paths
   [connection-map starts]
   (for [s starts]
     (let [p (iterate (fn [e] (second ((keyword (get-node-name e)) connection-map))) s)]
-      (take-while #(not= nil %) p))))
+      (map #(get-node-name %) (take-while #(not= nil %) p)))))
 
-(defn find-longest-path
+
+(defn sort-paths
   [connection-map starts]
   (let [a (find-all-paths connection-map starts)
         aa (map (fn [e] [(count e) e]) a)]
-    (second (reduce (fn [x y] (if (> (first x) (first y)) x y)) aa))))
+    (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
 
+(defn find-longest-path
+  [connection-map starts]
+  (let [a (sort-paths connection-map starts)]
+    (second (first a))))
+
+(defn merge-two-paths [p1 p2]
+  (let [ps (set p1)
+        s (split-with #(not (contains? ps %)) p2)
+        mids (first s)]
+    (if (empty? mids) p1
+        (let [split-node (first (second s))
+              wings (split-with #(not= % split-node) p1)]
+          (flatten [(first wings) mids (second wings)])))))
+
+(defn merge-paths
+  ([p] (merge-paths (first p) (rest p)))
+  ([acc r]
+     (if (empty? r) acc
+         (merge-paths (merge-two-paths acc (first r)) (rest r)))))
+
+(defn get-order [n]
+  (let [p (sort-paths (get-connection-map n) (get-starts n))]
+    (map keyword (merge-paths (map second p)))))
 
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
-  (let [connection-map (into {}  (for [e connections] [(keyword (get-node-name (first e))) e]))]
+  (let [connection-map (get-connection-map connections)]
    (doseq [node ordered-nodes]
      (if-let [[n1 n2] (get connection-map node) ]
        (let [node1 (restore-node n1 @nodes)
