@@ -530,6 +530,17 @@ Connections are references to two connection points
   [(filter pred coll)
    (filter (complement pred) coll)])
 
+
+(defn get-ends
+  "n is (:connections (load-file xxx.clj))"
+  [n]
+  (let [cn (for [[f t] n]
+             [(get-node-name f) (get-node-name t)])
+        tos (into #{} (for [[f t] cn] f))
+        m (filter #(not (contains? tos %)) (for [[f t] cn] t))]
+    (into #{} (flatten
+               (map (fn [e] (filter #(.startsWith (name %) e) (map second n))) m)))))
+
 (defn get-starts
   "n is (:connections (load-file xxx.clj))"
   [n]
@@ -537,14 +548,17 @@ Connections are references to two connection points
              [(get-node-name f) (get-node-name t)])
         tos (into #{} (for [[f t] cn] t))
         m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
-
-    ;; we need the input nodes to be first in the chain
-    ;; (sort (fn [x y] (if (.contains x "-in:")
-    ;;                  -1
-    ;;                  (if (.contains y "-in:")
-    ;;                    -1
-    ;;                    (compare x y)))) m)
     m))
+
+(defn get-starts-2
+  "n is (:connections (load-file xxx.clj))"
+  [n]
+  (let [cn (for [[f t] n]
+             [(get-node-name f) (get-node-name t)])
+        tos (into #{} (for [[f t] cn] t))
+        m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
+    (let [s (into #{} m)]
+      (map first (filter #(contains? s (get-node-name (first %))) n)))))
 
 ;; (defn get-chain [s1 n]
 ;;   (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
@@ -570,17 +584,46 @@ Connections are references to two connection points
           (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
+(defn get-node-name-split
+  [n]
+  (if (re-find #"split" (name n))
+    (name n)
+    (get-node-name n)))
+
+;; (defn get-connection-map
+;;   [connections]
+;;   (let [v (for [e connections]
+;;              (let [n (name (first e))]
+;;                (if (re-find #"split" n)
+;;                  [(keyword (str (get-node-name n) "-ob1")) e
+;;                   (keyword (str (get-node-name n) "-ob2")) e]
+;;                  [(keyword (get-node-name n)) e])))
+;;         v1 (flatten v)]
+;;     (doseq [s v] (println s))
+;;     (apply hash-map v1)))
+
 (defn get-connection-map
   [connections]
-  (into {}
-        (for [e connections]
-          [(keyword (get-node-name (first e))) e])))
+  (into {} (for [e connections]
+             [(keyword (get-node-name-split (first e))) e])))
+
+(defn get-connection-map-2
+  [connections]
+  (into {} (for [e connections]
+             [(keyword (second e)) e])))
+
 
 (defn find-all-paths
   [connection-map starts]
   (for [s starts]
-    (let [p (iterate (fn [e] (second ((keyword (get-node-name e)) connection-map))) s)]
-      (map #(get-node-name %) (take-while #(not= nil %) p)))))
+    (let [p (iterate (fn [e] (second ((keyword (get-node-name-split e)) connection-map))) s)]
+      (map #(get-node-name-split %) (take-while #(not= nil %) p)))))
+
+(defn find-all-paths-2
+  [connection-map starts]
+  (for [s starts]
+    (let [p (iterate (fn [e] (second (e connection-map))) s)]
+      (take-while #(not= nil %) p))))
 
 
 (defn sort-paths
