@@ -93,10 +93,9 @@
        (let [w1 (get @points id1)
              w2 (get @points id2)
              [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
-         ;(println x1 y1 x2 y2)
+         ;;(println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
-     (.setColor g cur-color)
-    ))
+     (.setColor g cur-color)))
 
 (defn get-synth-controls [s]
   (filter #(not (contains? #{"obus" "ibus" "gate"} %)) (map :name (:params s))))
@@ -632,6 +631,12 @@ Connections are references to two connection points
            (println ne acc)
            (find-all-paths-2 connections (map first ne) (cons e acc) a))))))
 
+
+(defn sort-paths
+  [connection-map ends]
+  (let [a (find-all-paths connection-map ends)
+        aa (map (fn [e] [(count e) e]) a)]
+    (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
 
 (defn sort-paths-2
   [connections ends]
