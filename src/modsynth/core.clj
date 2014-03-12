@@ -570,6 +570,21 @@ Connections are references to two connection points
           (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
+(defn find-implied-connections [c]
+  (let [candidates
+        (for [[_ f] c]
+          (for [[t _] c
+                :let [x [f t]]
+                :when (= (get-node-name t) (get-node-name f))]
+            x))]
+    (map vec (partition 2 (flatten candidates)))))
+
+(defn add-implied-connections [c]
+  (concat c (find-implied-connections c)))
+
+(defn remove-implied-connections [c]
+  (filter (fn [[t f]] (not= (get-node-name t) (get-node-name f))) c))
+
 (defn get-connection-map
   [connections]
   (into {}
