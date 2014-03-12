@@ -93,9 +93,10 @@
        (let [w1 (get @points id1)
              w2 (get @points id2)
              [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
-         ;;(println x1 y1 x2 y2)
+         ;(println x1 y1 x2 y2)
          (.drawLine g x1 y1 x2 y2)))
-     (.setColor g cur-color)))
+     (.setColor g cur-color)
+    ))
 
 (defn get-synth-controls [s]
   (filter #(not (contains? #{"obus" "ibus" "gate"} %)) (map :name (:params s))))
@@ -529,17 +530,6 @@ Connections are references to two connection points
   [(filter pred coll)
    (filter (complement pred) coll)])
 
-
-(defn get-ends
-  "n is (:connections (load-file xxx.clj))"
-  [n]
-  (let [cn (for [[f t] n]
-             [(get-node-name f) (get-node-name t)])
-        tos (into #{} (for [[f t] cn] f))
-        m (filter #(not (contains? tos %)) (for [[f t] cn] t))]
-    (into #{} (flatten
-               (map (fn [e] (filter #(.startsWith (name %) e) (map second n))) m)))))
-
 (defn get-starts
   "n is (:connections (load-file xxx.clj))"
   [n]
@@ -547,17 +537,14 @@ Connections are references to two connection points
              [(get-node-name f) (get-node-name t)])
         tos (into #{} (for [[f t] cn] t))
         m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
-    m))
 
-(defn get-starts-2
-  "n is (:connections (load-file xxx.clj))"
-  [n]
-  (let [cn (for [[f t] n]
-             [(get-node-name f) (get-node-name t)])
-        tos (into #{} (for [[f t] cn] t))
-        m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
-    (let [s (into #{} m)]
-      (map first (filter #(contains? s (get-node-name (first %))) n)))))
+    ;; we need the input nodes to be first in the chain
+    ;; (sort (fn [x y] (if (.contains x "-in:")
+    ;;                  -1
+    ;;                  (if (.contains y "-in:")
+    ;;                    -1
+    ;;                    (compare x y)))) m)
+    m))
 
 ;; (defn get-chain [s1 n]
 ;;   (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
@@ -583,34 +570,11 @@ Connections are references to two connection points
           (swap! gated-synths conj (:synth synth)))
         (swap! nodes assoc n1 node1))))
 
-(defn get-node-name-split
-  [n]
-  (if (re-find #"split" (name n))
-    (name n)
-    (get-node-name n)))
-
-;; (defn get-connection-map
-;;   [connections]
-;;   (let [v (for [e connections]
-;;              (let [n (name (first e))]
-;;                (if (re-find #"split" n)
-;;                  [(keyword (str (get-node-name n) "-ob1")) e
-;;                   (keyword (str (get-node-name n) "-ob2")) e]
-;;                  [(keyword (get-node-name n)) e])))
-;;         v1 (flatten v)]
-;;     (doseq [s v] (println s))
-;;     (apply hash-map v1)))
-
 (defn get-connection-map
   [connections]
-  (into {} (for [e connections]
-             [(keyword (get-node-name (first e))) e])))
-
-(defn get-connection-map-2
-  [connections]
-  (into {} (for [e connections]
-             [(keyword (second e)) e])))
-
+  (into {}
+        (for [e connections]
+          [(keyword (get-node-name (first e))) e])))
 
 (defn find-all-paths
   [connection-map starts]
@@ -618,29 +582,10 @@ Connections are references to two connection points
     (let [p (iterate (fn [e] (second ((keyword (get-node-name e)) connection-map))) s)]
       (map #(get-node-name %) (take-while #(not= nil %) p)))))
 
-(defn find-all-paths-2
-  ([connections ends]
-     (let [a (atom [])]
-       (find-all-paths-2 connections ends [] a)
-       @a))
-  ([connections ends acc a]
-     (if (empty? ends)
-       (swap! a conj acc)
-       (doseq [e ends]
-         (let [ne (filter #(.startsWith (name (second %)) (get-node-name e)) connections)]
-           (println ne acc)
-           (find-all-paths-2 connections (map first ne) (cons e acc) a))))))
-
 
 (defn sort-paths
-  [connection-map ends]
-  (let [a (find-all-paths connection-map ends)
-        aa (map (fn [e] [(count e) e]) a)]
-    (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
-
-(defn sort-paths-2
-  [connections ends]
-  (let [a (find-all-paths-2 connections ends)
+  [connection-map starts]
+  (let [a (find-all-paths connection-map starts)
         aa (map (fn [e] [(count e) e]) a)]
     (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
 
@@ -665,12 +610,8 @@ Connections are references to two connection points
          (merge-paths (merge-two-paths acc (first r)) (rest r)))))
 
 (defn get-order [n]
-  (let [p (sort-paths-2 n (get-ends n))]
-    (map keyword (merge-paths (map second p)))))
-
-(defn get-order-2 [n]
   (let [p (sort-paths (get-connection-map n) (get-starts n))]
-    (map (comp keyword get-node-name) (merge-paths (map second p)))))
+    (map keyword (merge-paths (map second p)))))
 
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
@@ -708,7 +649,7 @@ Connections are references to two connection points
 (defn sound-on [e]
   (s/svolume (:master-vol @s-panel))
   (swap! s-panel assoc :run-mode true)
-  (let [ordered-nodes (get-order-2 @connections)]
+  (let [ordered-nodes (get-order @connections)]
     (instantiate-synths ordered-nodes)
     (build-synths-and-connections ordered-nodes @connections false)))
 
@@ -810,7 +751,7 @@ Connections are references to two connection points
   (ms-reset!)
   (swap! s-panel assoc :master-vol (:master-vol r))
   (let [f (-main)
-        o (get-order-2 (:connections r))
+        o (get-order (:connections r))
         node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
         m (into {}
            (for [n1 o]
