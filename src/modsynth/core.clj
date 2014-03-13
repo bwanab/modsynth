@@ -533,10 +533,8 @@ Connections are references to two connection points
 (defn get-starts
   "n is (:connections (load-file xxx.clj))"
   [n]
-  (let [cn (for [[f t] n]
-             [(get-node-name f) (get-node-name t)])
-        tos (into #{} (for [[f t] cn] t))
-        m (filter #(not (contains? tos %)) (for [[f t] cn] f))]
+  (let [tos (into #{} (for [[f t] n] t))
+        m (filter #(not (contains? tos %)) (for [[f t] n] f))]
 
     ;; we need the input nodes to be first in the chain
     ;; (sort (fn [x y] (if (.contains x "-in:")
@@ -545,6 +543,18 @@ Connections are references to two connection points
     ;;                    -1
     ;;                    (compare x y)))) m)
     m))
+
+
+(defn get-ends
+  "n is (:connections (load-file xxx.clj))"
+  [n]
+  (let [cn (for [[f t] n]
+             [(get-node-name f) (get-node-name t)])
+        tos (into #{} (for [[f t] cn] f))
+        m (filter #(not (contains? tos %)) (for [[f t] cn] t))]
+    (into #{} (flatten
+               (map (fn [e] (filter #(.startsWith (name %) e) (map second n))) m)))))
+
 
 ;; (defn get-chain [s1 n]
 ;;   (let [[neighbors others] (partition-with #(= s1 (get-node-name (first %))) n)]
@@ -589,14 +599,35 @@ Connections are references to two connection points
   [connections]
   (into {}
         (for [e connections]
-          [(keyword (get-node-name (first e))) e])))
+          [(keyword (first e)) e])))
+
+(defn get-connection-map
+  [connections]
+  (loop [c connections r {}]
+    (if (empty? c) r
+        (let [e (first c)
+              k (first e)
+              b (k r)]
+          (recur (rest c) (assoc r (first e) (if b (vec (concat b [e])) [e])))))))
 
 (defn find-all-paths
   [connection-map starts]
   (for [s starts]
-    (let [p (iterate (fn [e] (second ((keyword (get-node-name e)) connection-map))) s)]
-      (map #(get-node-name %) (take-while #(not= nil %) p)))))
+    (let [p (iterate (fn [e] (second ((keyword e) connection-map))) s)]
+      (take-while #(not= nil %) p))))
 
+(defn find-all-paths-2
+  ([connections ends]
+     (let [a (atom [])]
+       (find-all-paths-2 connections ends [] a)
+       @a))
+  ([connections ends acc a]
+     (if (empty? ends)
+       (swap! a conj acc)
+       (doseq [e ends]
+         (let [ne (filter #(.startsWith (name (second %)) (name e)) connections)]
+           (println ne acc)
+           (find-all-paths-2 connections (map first ne) (cons e acc) a))))))
 
 (defn sort-paths
   [connection-map starts]
@@ -625,7 +656,8 @@ Connections are references to two connection points
          (merge-paths (merge-two-paths acc (first r)) (rest r)))))
 
 (defn get-order [n]
-  (let [p (sort-paths (get-connection-map n) (get-starts n))]
+  (let [c (add-implied-connections n)
+        p (sort-paths (get-connection-map c) (get-starts c))]
     (map keyword (merge-paths (map second p)))))
 
 (defn build-synths-and-connections
