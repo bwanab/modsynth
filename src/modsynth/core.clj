@@ -599,9 +599,9 @@ Connections are references to two connection points
   [connections]
   (into {}
         (for [e connections]
-          [(keyword (first e)) e])))
+          [(keyword (get-node-name (first e))) e])))
 
-(defn get-connection-map
+(defn get-connection-map-2
   [connections]
   (loop [c connections r {}]
     (if (empty? c) r
@@ -626,7 +626,6 @@ Connections are references to two connection points
        (swap! a conj acc)
        (doseq [e ends]
          (let [ne (filter #(.startsWith (name (second %)) (name e)) connections)]
-           (println ne acc)
            (find-all-paths-2 connections (map first ne) (cons e acc) a))))))
 
 (defn sort-paths
@@ -635,19 +634,38 @@ Connections are references to two connection points
         aa (map (fn [e] [(count e) e]) a)]
     (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
 
+(defn sort-paths-2
+  [connections ends]
+  (let [a (find-all-paths-2 connections ends)
+        aa (map (fn [e] [(count e) e]) a)]
+    (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
+
 (defn find-longest-path
   [connection-map starts]
   (let [a (sort-paths connection-map starts)]
     (second (first a))))
 
+;; (defn merge-two-paths [p1 p2]
+;;   (let [ps (set p1)
+;;         s (split-with #(not (contains? ps %)) p2)
+;;         mids (first s)]
+;;     (if (empty? mids) p1
+;;         (let [split-node (first (second s))
+;;               wings (split-with #(not= % split-node) p1)]
+;;           (flatten [(first wings) mids (second wings)])))))
+
 (defn merge-two-paths [p1 p2]
   (let [ps (set p1)
-        s (split-with #(not (contains? ps %)) p2)
-        mids (first s)]
-    (if (empty? mids) p1
-        (let [split-node (first (second s))
-              wings (split-with #(not= % split-node) p1)]
-          (flatten [(first wings) mids (second wings)])))))
+        pa (partition-with #(not (contains? ps %)) p2)]
+    (loop [nts (first pa) acc p1]
+      (do
+        ;;(println nts acc)
+        (if (empty? nts) acc
+           (let [n (first nts)
+                 wings (split-with #(not= (get-node-name %) (get-node-name n)) acc)]
+             (recur (rest nts) (flatten (if (empty? (second wings))
+                                          [n (first wings)]
+                                          [(first wings) n (second wings)])))))))))
 
 (defn merge-paths
   ([p] (merge-paths (first p) (rest p)))
@@ -660,9 +678,14 @@ Connections are references to two connection points
         p (sort-paths (get-connection-map c) (get-starts c))]
     (map keyword (merge-paths (map second p)))))
 
+(defn get-order-2 [n]
+  (let [c (add-implied-connections n)
+        p (sort-paths-2 c (get-ends c))]
+    (distinct (merge-paths (map second p)))))
+
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
-  (let [connection-map (get-connection-map connections)]
+  (let [connection-map (get-connection-map-2 connections)]
    (doseq [node ordered-nodes]
      (if-let [[n1 n2] (get connection-map node) ]
        (let [node1 (restore-node n1 @nodes)
@@ -798,7 +821,8 @@ Connections are references to two connection points
   (ms-reset!)
   (swap! s-panel assoc :master-vol (:master-vol r))
   (let [f (-main)
-        o (get-order (:connections r))
+        c (:connections r)
+        o (get-order (distinct (map get-node-name c)))
         node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
         m (into {}
            (for [n1 o]
@@ -811,6 +835,6 @@ Connections are references to two connection points
                    v (:v n)]
                (println n s wname wnum x y)
                [(:w n) (make-node wname wnum x y v)])))]
-    (build-synths-and-connections o (:connections r) true)
+    (build-synths-and-connections (get-order-2 c) c true)
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil))
