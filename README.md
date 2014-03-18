@@ -16,12 +16,12 @@ A modular synth system somewhat along the lines of PD, but at a higher level of 
 - [ ] Save/restore dialog
 - [x] save/restore needs to be better tested.
 - [x] Save values for sliders and const.
-- [ ] Fix slider.
+- [x] Fix slider.
 - [x] A disconnect method.
 - [x] splitter and
-- [ ] mixer nodes for audio and control.
+- [x] mixer nodes for audio and control.
 - [ ] More synth types:
-- [ ] Random note and timing
+- [x] Random note and timing
 - [ ] some kind of file input for compositions if there is an overtone standard use that.
 
 ## License

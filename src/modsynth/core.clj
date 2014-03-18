@@ -406,6 +406,15 @@ Connections are references to two connection points
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
               :cent t)))
 
+(defn slider-ctl [e]
+  (let [id (get-id "slider-ctl" e)
+        s (slider :value 0 :min 0 :max 100 :orientation :vertical)
+        f (fn [] (let [synth (s/const)
+                      unregister (listen s :change (fn [e] (s/sctl synth :ibus (int (value s)))))]
+                  (s/sctl synth :ibus (int (value s)))
+                  {:synth synth :stop-fn unregister}))]
+    (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const :cent s)))
+
 (defn play-note [synth n]
   (s/sctl synth :note n)
   (doseq [gated-synth @gated-synths]
@@ -436,10 +445,6 @@ Connections are references to two connection points
                    {:synth synth}))]
     (add-node :name id :play-fn f :output "freq" :out-type :control)))
 
-(defn slider-ctl [e]
-  (let [id (get-id "slider-ctl" e)
-        s (slider :value 0 :min 0 :max 100 :orientation :vertical)]
-    (add-node :name id :synth s :output "val" :out-type :manual :cent s)))
 
 
 ;;
