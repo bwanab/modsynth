@@ -9,7 +9,7 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns modsynth.core
-  (:use [seesaw core border behave graphics color]
+  (:use [seesaw core border behave graphics color chooser]
         [modsynth.piano]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
@@ -199,21 +199,17 @@
 
 (defn make-connection
   [lid lpoint wid wpoint]
-  ;;(println "lid = " lid " wid = " wid)
-  (cond ;; if the two points are connected, disconnect them.
-   (connected? lid wid) (reset! connections (filter #(not= % [lid wid]) @connections))
-   (connected? wid lid) (reset! connections (filter #(not= % [wid lid]) @connections))
-   :else (let [lpn (get-node-name lid)
-               wpn (get-node-name wid)]
-           (when (not= lpn wpn) ; don't connect points of same node
-            (if (:run-mode @s-panel)
-              (cond (= :manual (get-in lpoint [:node :out-type])) (connect-manual lpoint wpoint)
-                    (= :manual (get-in wpoint [:node :out-type])) (connect-manual wpoint lpoint)
-                    :else
-                    (let [c (connect-points lpoint wpoint)]
-                      (swap! busses assoc (:name c) c))))
-            (swap! connections conj [lid wid]))))
-  (swap! s-panel assoc :last-point  nil))
+  (if (:run-mode @s-panel)
+    (alert "no editing while sound on")
+    (do
+      (cond ;; if the two points are connected, disconnect them.
+       (connected? lid wid) (reset! connections (filter #(not= % [lid wid]) @connections))
+       (connected? wid lid) (reset! connections (filter #(not= % [wid lid]) @connections))
+       :else (let [lpn (get-node-name lid)
+                   wpn (get-node-name wid)]
+               (when (not= lpn wpn)   ; don't connect points of same node
+                 (swap! connections conj [lid wid]))))
+      (swap! s-panel assoc :last-point  nil :changes-pending true))))
 
 "
 Each element on the screen is a node. Each node represents a visual widget and a synth or a manual controller like a slider. Every node
@@ -224,45 +220,48 @@ Connections are references to two connection points
 "
 
 (defn add-node [& ps]
-  (let [io (apply hash-map ps)
-        id (:name io)
-        kw (keyword id)
-        otype (:output io)
-        ins  (make-io io :input id otype)
-        outs  (make-io io :output id otype)
-        gated (has-gate (:synth-type io))
-        node (assoc io :widget (doto (border-panel :id id
-                                           :border (line-border :top 1 :color "#AAFFFF")
-                                           :north (label :text id :background "#AAFFFF" :h-text-position :center)
-                                           :center (if (= nil (:cent io)) (label "") (:cent io))
-                                           :east (grid-panel :rows (count outs) :columns 1 :items outs)
-                                           :west (grid-panel :rows (count ins) :columns 1 :items ins)
-                                           )
+  (if (:run-mode @s-panel)
+    (alert "no editing while sound on")
+    (let [io (apply hash-map ps)
+          id (:name io)
+          kw (keyword id)
+          otype (:output io)
+          ins  (make-io io :input id otype)
+          outs  (make-io io :output id otype)
+          gated (has-gate (:synth-type io))
+          node (assoc io :widget (doto (border-panel :id id
+                                                     :border (line-border :top 1 :color "#AAFFFF")
+                                                     :north (label :text id :background "#AAFFFF" :h-text-position :center)
+                                                     :center (if (= nil (:cent io)) (label "") (:cent io))
+                                                     :east (grid-panel :rows (count outs) :columns 1 :items outs)
+                                                     :west (grid-panel :rows (count ins) :columns 1 :items ins)
+                                                     )
                                    (config! :bounds :preferred)
                                    movable)
-                    :id kw :inputs ins :outputs outs :gated gated)]
-    ;;(println "add node " id)
-    (swap! nodes assoc kw node)
-    (doseq [b (concat ins outs)]
-      (let [wpoint {:point b :node node}
-            wid (config b :id)]
-        (swap! points assoc wid wpoint)
-        (listen b :action
-                (fn [e]
-                  (if-let [lid (:last-point @s-panel)]
-                    (let [lpoint (get @points lid)]
-                      (make-connection lid lpoint wid wpoint)
-                      (let [lp (:point lpoint)
-                            bc (default-color "Button.background")]
-                        ;;(println "lp = " lp " bc = " bc)
-                        (config! lp :background bc)))
-                    (do
-                      (swap! s-panel assoc :last-point wid)
-                      (config! b :background :blue)))))))
-    (config! (:panel @s-panel)
-             :items (conj (config (:panel @s-panel) :items)
-                          (:widget node)))
-    node))
+                      :id kw :inputs ins :outputs outs :gated gated)]
+      ;;(println "add node " id)
+      (swap! nodes assoc kw node)
+      (swap! s-panel assoc :changes-pending true)
+      (doseq [b (concat ins outs)]
+        (let [wpoint {:point b :node node}
+              wid (config b :id)]
+          (swap! points assoc wid wpoint)
+          (listen b :action
+                  (fn [e]
+                    (if-let [lid (:last-point @s-panel)]
+                      (let [lpoint (get @points lid)]
+                        (make-connection lid lpoint wid wpoint)
+                        (let [lp (:point lpoint)
+                              bc (default-color "Button.background")]
+                          ;;(println "lp = " lp " bc = " bc)
+                          (config! lp :background bc)))
+                      (do
+                        (swap! s-panel assoc :last-point wid)
+                        (config! b :background :blue)))))))
+      (config! (:panel @s-panel)
+               :items (conj (config (:panel @s-panel) :items)
+                            (:widget node)))
+      node)))
 
 (defn get-id [t e]
   (let [id (if (number? e) e (swap! next-id inc))]
@@ -702,13 +701,13 @@ Connections are references to two connection points
   (s/svolume 0.0))
 
 (defn ms-reset! []
+  (sound-off 0)
   (reset! connections [])
   (reset! gated-synths #{})
   (reset! points {})
   (reset! nodes {})
   (reset! busses {})
-  (reset! next-id 0)
-  (sound-off 0))
+  (reset! next-id 0))
 
 (defn make-panel []
   (xyz-panel
@@ -718,12 +717,16 @@ Connections are references to two connection points
     :items []
     ))
 
+(declare ms-load-file ms-save-file)
+
 (defn fr []
   (let [p (make-panel)]
     (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
     (frame
      :menubar (menubar :items [(menu :text "File"
-                                     :items [(action :handler sound-on :name "Sound On")
+                                     :items [(action :handler ms-load-file :name "Load File")
+                                             (action :handler ms-save-file :name "Save File")
+                                             (action :handler sound-on :name "Sound On")
                                              (action :handler sound-off :name "Sound Off")
                                              (action :handler dispose! :name "Exit")])
                                (menu :text "New Control"
@@ -771,8 +774,7 @@ Connections are references to two connection points
 (defn -main [& args]
   (ms-reset!)
   (let [f (invoke-now (fr))]
-    (swap! s-panel assoc :frame f)
-    (swap! s-panel assoc :run-mode false)
+    (swap! s-panel assoc :frame f :run-mode false :changes-pending false)
     (config! f :on-close :dispose)
     (-> f bugger-what! show!)))
 
@@ -797,7 +799,6 @@ Connections are references to two connection points
         c (:connections r)
         o (distinct (map (comp keyword get-node-name) (get-order c)))
         node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))]
-    (println node-map)
     (doseq [n1 o]
              (let [n (get node-map n1)
                    s (str/split (name (:w n)) #":")
@@ -808,7 +809,28 @@ Connections are references to two connection points
                    v (:v n)]
                (println n s wname wnum x y)
                [(:w n) (make-node wname wnum x y v)]))
-    (println "here!")
     (build-synths-and-connections (get-order c) c true)
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil))
+
+(defn ms-load-file [e]
+  (let [cont? (if (:changes-pending @s-panel)
+                (not (confirm (:frame @s-panel) "edits pending - save?" :option-type :yes-no))
+                true)]
+    (when cont?
+      (let [dir (java.lang.System/getProperty "user.dir")
+            file (choose-file ;(:frame @s-panel)
+                              :dir dir
+                              :success-fn (fn [fc file] (.getAbsolutePath file)))]
+        (restore (load-file file))))))
+
+(defn ms-save-file [e]
+  (if (:changes-pending @s-panel)
+    (let [dir (java.lang.System/getProperty "user.dir")
+          file (choose-file (:frame @s-panel)
+                            :type :save
+                            :dir dir
+                            :success-fn (fn [fc file] (.getAbsolutePath file)))]
+      (spit file (dump-all))
+      (swap! s-panel :changes-pending false))
+    (alert "no changes to be saved")))
