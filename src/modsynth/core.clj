@@ -505,7 +505,8 @@ Connections are references to two connection points
    :frame (get-frame-dimension (:frame @s-panel))})
 
 (defn make-node [ntype id x y v]
-  (let [s (str "(" ntype " " id ")")
+  (let [s (str "(modsynth.core/" ntype " " id ")")
+        qq (println s)
         m (load-string s)
         w (:widget m)
         kw (config w :id)]
@@ -811,23 +812,24 @@ Connections are references to two connection points
                [(:w n) (make-node wname wnum x y v)]))
     (build-synths-and-connections (get-order c) c true)
     (set-frame-size f (:frame r)))
-  (swap! s-panel assoc :last-point  nil))
+  (swap! s-panel assoc :last-point  nil :changes-pending false))
 
 (defn ms-load-file [e]
   (let [cont? (if (:changes-pending @s-panel)
-                (not (confirm (:frame @s-panel) "edits pending - save?" :option-type :yes-no))
+                (not (confirm (:panel @s-panel) "edits pending - save?" :option-type :yes-no))
                 true)]
     (when cont?
       (let [dir (java.lang.System/getProperty "user.dir")
-            file (choose-file ;(:frame @s-panel)
+            file (choose-file (:panel @s-panel)
                               :dir dir
                               :success-fn (fn [fc file] (.getAbsolutePath file)))]
+        (hide! (:frame @s-panel))
         (restore (load-file file))))))
 
 (defn ms-save-file [e]
   (if (:changes-pending @s-panel)
     (let [dir (java.lang.System/getProperty "user.dir")
-          file (choose-file (:frame @s-panel)
+          file (choose-file (:panel @s-panel)
                             :type :save
                             :dir dir
                             :success-fn (fn [fc file] (.getAbsolutePath file)))]
