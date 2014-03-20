@@ -718,7 +718,7 @@ Connections are references to two connection points
     :items []
     ))
 
-(declare ms-load-file ms-save-file)
+(declare ms-load-file ms-save-file ms-save-file-as)
 
 (defn fr []
   (let [p (make-panel)]
@@ -727,6 +727,7 @@ Connections are references to two connection points
      :menubar (menubar :items [(menu :text "File"
                                      :items [(action :handler ms-load-file :name "Load File")
                                              (action :handler ms-save-file :name "Save File")
+                                             (action :handler ms-save-file-as :name "Save File As")
                                              (action :handler sound-on :name "Sound On")
                                              (action :handler sound-off :name "Sound Off")
                                              (action :handler dispose! :name "Exit")])
@@ -822,17 +823,25 @@ Connections are references to two connection points
       (let [dir (java.lang.System/getProperty "user.dir")
             file (choose-file (:panel @s-panel)
                               :dir dir
+                              :filters [["Mod Synths" ["clj"]]]
                               :success-fn (fn [fc file] (.getAbsolutePath file)))]
         (hide! (:frame @s-panel))
         (restore (load-file file))))))
 
-(defn ms-save-file [e]
-  (if (:changes-pending @s-panel)
-    (let [dir (java.lang.System/getProperty "user.dir")
-          file (choose-file (:panel @s-panel)
-                            :type :save
-                            :dir dir
-                            :success-fn (fn [fc file] (.getAbsolutePath file)))]
-      (spit file (dump-all))
-      (swap! s-panel :changes-pending false))
-    (alert "no changes to be saved")))
+(defn ms-save-file
+  ([e] (ms-save-file e false))
+  ([e is-as]
+     (if (or is-as (:changes-pending @s-panel))
+       (let [dir (java.lang.System/getProperty "user.dir")
+             file (choose-file (:panel @s-panel)
+                               :type :save
+                               :dir dir
+                               :filters [["Mod Synths" ["clj"]]]
+                               :success-fn (fn [fc file] (.getAbsolutePath file)))]
+         (when file
+           (spit file (dump-all))
+           (swap! s-panel :changes-pending false)))
+       (alert "no changes to be saved"))))
+
+(defn ms-save-file-as [e]
+  (ms-save-file e true))
