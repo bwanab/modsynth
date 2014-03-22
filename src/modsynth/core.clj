@@ -697,9 +697,10 @@ Connections are references to two connection points
     (build-synths-and-connections ordered-nodes @connections false)))
 
 (defn sound-off [e]
-  (kill-running-synths (reverse (get-node-order (get-order @connections))))
-  (swap! s-panel assoc :run-mode false)
-  (s/svolume 0.0))
+  (when (:run-mode @s-panel)
+    (kill-running-synths (reverse (get-node-order (get-order @connections))))
+    (swap! s-panel assoc :run-mode false)
+    (s/svolume 0.0)))
 
 (defn ms-reset! []
   (sound-off 0)
@@ -726,6 +727,7 @@ Connections are references to two connection points
     (frame
      :menubar (menubar :items [(menu :text "File"
                                      :items [(action :handler ms-load-file :name "Load File")
+                                             (action :handler ms-load-example :name "Load Example")
                                              (action :handler ms-save-file :name "Save File")
                                              (action :handler ms-save-file-as :name "Save File As")
                                              (action :handler sound-on :name "Sound On")
@@ -815,18 +817,21 @@ Connections are references to two connection points
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil :changes-pending false))
 
-(defn ms-load-file [e]
-  (let [cont? (if (:changes-pending @s-panel)
-                (not (confirm (:panel @s-panel) "edits pending - save?" :option-type :yes-no))
-                true)]
-    (when cont?
-      (let [dir (java.lang.System/getProperty "user.dir")
-            file (choose-file (:panel @s-panel)
-                              :dir dir
-                              :filters [["Mod Synths" ["clj"]]]
-                              :success-fn (fn [fc file] (.getAbsolutePath file)))]
-        (hide! (:frame @s-panel))
-        (restore (load-file file))))))
+(defn ms-load-example [e]
+  (ms-load-file e "./examples"))
+
+(defn ms-load-file
+  ([e] (ms-load-file e (java.lang.System/getProperty "user.dir")))
+  ([e dir] (let [cont? (if (:changes-pending @s-panel)
+                         (not (confirm (:panel @s-panel) "edits pending - save?" :option-type :yes-no))
+                         true)]
+             (when cont?
+               (let [file (choose-file (:panel @s-panel)
+                                       :dir dir
+                                       :filters [["Mod Synths" ["oms"]]]
+                                       :success-fn (fn [fc file] (.getAbsolutePath file)))]
+                 (hide! (:frame @s-panel))
+                 (restore (load-file file)))))))
 
 (defn ms-save-file
   ([e] (ms-save-file e false))
@@ -836,7 +841,7 @@ Connections are references to two connection points
              file (choose-file (:panel @s-panel)
                                :type :save
                                :dir dir
-                               :filters [["Mod Synths" ["clj"]]]
+                               :filters [["Mod Synths" ["oms"]]]
                                :success-fn (fn [fc file] (.getAbsolutePath file)))]
          (when file
            (spit file (dump-all))

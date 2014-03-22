@@ -1,0 +1,1 @@
+{:nodes '({:x 252.0, :y 181.0, :w :audio-out:3} {:x 74.0, :y 80.0, :w :saw-osc:2} {:x 0.0, :y 0.0, :w :midi-in:1}), :connections '[[:midi-in:1-freq :saw-osc:2-freq] [:saw-osc:2-sig :audio-out:3-b1]], :master-vol 0.3}
