@@ -514,7 +514,6 @@ Connections are references to two connection points
 
 (defn make-node [ntype id x y v]
   (let [s (str "(modsynth.core/" ntype " " id ")")
-        qq (println s)
         m (load-string s)
         w (:widget m)
         kw (config w :id)]
