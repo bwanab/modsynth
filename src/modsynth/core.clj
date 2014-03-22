@@ -414,10 +414,12 @@ Connections are references to two connection points
                   {:synth synth :stop-fn unregister}))]
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const :cent s)))
 
-(defn doc-node [e]
-  (let [id (get-id "doc-node" e)
-        t (scrollable (text :multi-line? true :editable? true :wrap-lines? true :columns 20 :rows 10 :id (str id "-text")))]
-    (add-node :name id :cent t)))
+(defn doc-node
+  ([e] (doc-node e 8))
+  ([e rows]
+     (let [id (get-id "doc-node" e)
+           t (scrollable (text :multi-line? true :editable? true :wrap-lines? true :columns 20 :rows (+ 2 rows) :id (str id "-text")))]
+       (add-node :name id :cent t))))
 
 (defn play-note [synth n]
   (s/sctl synth :note n)
@@ -513,7 +515,8 @@ Connections are references to two connection points
    :frame (get-frame-dimension (:frame @s-panel))})
 
 (defn make-node [ntype id x y v]
-  (let [s (str "(modsynth.core/" ntype " " id ")")
+  (let [rc (if (= ntype "doc-node") (count (filter #(= \newline %) v)))
+        s (str "(modsynth.core/" ntype " " id " " rc ")")
         m (load-string s)
         w (:widget m)
         kw (config w :id)]
