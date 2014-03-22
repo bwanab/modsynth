@@ -414,6 +414,11 @@ Connections are references to two connection points
                   {:synth synth :stop-fn unregister}))]
     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const :cent s)))
 
+(defn doc-node [e]
+  (let [id (get-id "doc-node" e)
+        t (scrollable (text :multi-line? true :editable? true :wrap-lines? true :columns 20 :rows 10 :id (str id "-text")))]
+    (add-node :name id :cent t)))
+
 (defn play-note [synth n]
   (s/sctl synth :note n)
   (doseq [gated-synth @gated-synths]
@@ -471,7 +476,10 @@ Connections are references to two connection points
 (defn get-if-value
   [w kw]
   (if-let [vw (get-value-field w kw)]
-    (read-string (config vw :text))
+    (let [t (config vw :text)]
+      (if (.startsWith (get-node-name kw) "doc")
+        t
+        (read-string t)))
     nil))
 
 (defn dump-nodes []
@@ -719,7 +727,7 @@ Connections are references to two connection points
     :items []
     ))
 
-(declare ms-load-file ms-save-file ms-save-file-as)
+(declare ms-load-file ms-save-file ms-save-file-as ms-load-example)
 
 (defn fr []
   (let [p (make-panel)]
@@ -761,6 +769,7 @@ Connections are references to two connection points
                                              (action :handler a-mixer-4 :name "4 Ch mixer")
                                              (action :handler audio-out :name "Audio out")
                                              (action :handler audio-in :name "Audio in")
+                                             (action :handler doc-node :name "Doc Node")
                                              ])])
      :title   "Overtone Modular Synth"
      :content (border-panel
@@ -802,17 +811,20 @@ Connections are references to two connection points
   (let [f (-main)
         c (:connections r)
         o (distinct (map (comp keyword get-node-name) (get-order c)))
-        node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))]
+        node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
+        r-make-node (fn [n] (let [s (str/split (name (:w n)) #":")
+                                 wname (first s)
+                                 wnum  (second s)
+                                 x (:x n)
+                                 y (:y n)
+                                 v (:v n)]
+                             (println n s wname wnum x y)
+                             (make-node wname wnum x y v)))]
     (doseq [n1 o]
-             (let [n (get node-map n1)
-                   s (str/split (name (:w n)) #":")
-                   wname (first s)
-                   wnum  (second s)
-                   x (:x n)
-                   y (:y n)
-                   v (:v n)]
-               (println n s wname wnum x y)
-               [(:w n) (make-node wname wnum x y v)]))
+      (let [n (get node-map n1)]
+        [(:w n) (r-make-node n)]))
+    (doseq [n (filter #(.startsWith (get-node-name (:w %)) "doc") (:nodes r))]
+      (r-make-node n))
     (build-synths-and-connections (get-order c) c true)
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil :changes-pending false))
