@@ -180,11 +180,15 @@
   (println "make synth " (:name s))
   (let [synth (s)]
     (doseq [p (get-synth-controls s)]
-      (let [c (s/const)
-            val (:def p)]
-        (when val (do
-                    (s/connect-points c s :control (:keyword p))
-                    (s/sctl c :val val)))))
+      (let [cnst (s/const)
+            in-point (first (filter #(= (:name %) p) (:params s)))
+            val (:def in-point)]
+        (future
+          (Thread/sleep 50)
+          (println "val = " val " p = " p " type val = " (type val))
+          (when val (let [c (s/connect-points cnst synth :control (keyword p) (str "default const -> " p))]
+                    (s/sctl cnst :ibus val)
+                    (swap! busses assoc (:name c) c))))))
     {:synth synth}))
 
 (defn get-node-name [node-name]
