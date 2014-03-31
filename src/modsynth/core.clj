@@ -9,7 +9,7 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns modsynth.core
-  (:use [seesaw core border behave graphics color chooser]
+  (:use [seesaw core border behave graphics color chooser table]
         [modsynth.piano]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
@@ -35,6 +35,7 @@
 
 (defn print-monitors [bmg]
   (doseq [k (keys bmg)] (println k ":" (deref (get bmg k)))))
+
 
 ; Put in some basic support for moving w around using behave/when-mouse-dragged.
 (defn movable [w]
@@ -179,16 +180,16 @@
 (defn make-synth [s]
   (println "make synth " (:name s))
   (let [synth (s)]
-    (doseq [p (get-synth-controls s)]
-      (let [cnst (s/const)
-            in-point (first (filter #(= (:name %) p) (:params s)))
-            val (:def in-point)]
-        (future
-          (Thread/sleep 50)
-          (println "val = " val " p = " p " type val = " (type val))
-          (when val (let [c (s/connect-points cnst synth :control (keyword p) (str "default const -> " p))]
-                    (s/sctl cnst :ibus val)
-                    (swap! busses assoc (:name c) c))))))
+    ;; (doseq [p (get-synth-controls s)]
+    ;;   (let [cnst (s/const)
+    ;;         in-point (first (filter #(= (:name %) p) (:params s)))
+    ;;         val (:def in-point)]
+    ;;     (future
+    ;;       (Thread/sleep 50)
+    ;;       (println "val = " val " p = " p " type val = " (type val))
+    ;;       (when val (let [c (s/connect-points cnst synth :control (keyword p) (str "default const -> " p))]
+    ;;                 (s/sctl cnst :ibus val)
+    ;;                 (swap! busses assoc (:name c) c))))))
     {:synth synth}))
 
 (defn get-node-name [node-name]
@@ -733,7 +734,11 @@ Connections are references to two connection points
     :items []
     ))
 
-(declare ms-load-file ms-save-file ms-save-file-as ms-load-example)
+(declare ms-load-file
+         ms-save-file
+         ms-save-file-as
+         ms-load-example
+         monitor-all-busses)
 
 (defn fr []
   (let [p (make-panel)]
@@ -744,6 +749,7 @@ Connections are references to two connection points
                                              (action :handler ms-load-example :name "Load Example")
                                              (action :handler ms-save-file :name "Save File")
                                              (action :handler ms-save-file-as :name "Save File As")
+                                             (action :handler monitor-all-busses :name "Buss Monitor")
                                              (action :handler sound-on :name "Sound On")
                                              (action :handler sound-off :name "Sound Off")
                                              (action :handler dispose! :name "Exit")])
@@ -760,6 +766,7 @@ Connections are references to two connection points
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
                                              (action :handler hp-filt :name "HP Filt")
+                                             (action :handler bp-filt :name "BP Filt")
                                              (action :handler moog-filt :name "Moog Filt")
                                              (action :handler freeverb :name "Freeverb")
                                              (action :handler echo :name "Echo")
@@ -789,6 +796,23 @@ Connections are references to two connection points
   (if (= (java.awt.Dimension.) (.getSize f))
     (pack! f)
     f))
+
+(defn monitor-all-busses [e]
+  (future
+    (let [bm (all-bus-monitors)
+          v (fn [bm] (for [k (keys bm)] {:name k :val (deref (get bm k))}))
+          c [:name :val]
+          t (table :model [:columns c :rows (v bm)])
+          f (frame :title "Buss Monitor"
+                   :content (border-panel :center t))]
+      (-> f bugger-what! show!)
+      (loop []
+        (Thread/sleep 200)
+        (let [bm1 (all-bus-monitors)
+              model (table-model :columns c :rows (v bm1))]
+          (config! t :model model))
+        (recur)))))
+
 
 (defn -main [& args]
   (ms-reset!)
