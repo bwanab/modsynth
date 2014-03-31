@@ -156,11 +156,11 @@
 ;;     (out obus (pulse freq (/ width 100.0)))))
 
 (defsynth lp-filt
-  [cutoff {:default B1 :def 300 :min 0 :max 4000 :step 1}
+  [cutoff {:default B1 :def 300 :min 30 :max 4000 :step 1}
    obus OB
    ibus IB]
   (let [sig (in:ar ibus 2)
-        c (* (in:kr cutoff 1) 40)]  ;; the input is 0-100, the out put must be 0-4000
+        c (+ 30 (* (in:kr cutoff 1) 40))] ;; the input is 0-100, the out put must be 0-4000
     (out obus (lpf sig c))))
 
 (defsynth hp-filt
@@ -291,10 +291,9 @@
     (out obus (+ echo sig))))
 
 (defn bus-monitor-group [bs]
-  (apply hash-map
-   (flatten (map #(let [[k v] %
-                        bm (bus-monitor v)]
-                    [k bm]) bs))))
+  (into {} (map #(let [[k v] %
+                       bm (bus-monitor v)]
+                   [k bm]) bs)))
 
 (defn cbus [name] (control-bus 1 name))
 
