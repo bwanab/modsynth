@@ -797,10 +797,20 @@ Connections are references to two connection points
     (pack! f)
     f))
 
+(defn get-buss-order [c]
+  (let [o (get-order c)
+        cm (get-connection-map c)]
+    (for [oo o
+          :let [v (oo cm)]
+          :when v]
+      (let [[[f t]] v] (str (name f) " -> " (name t))))))
+
 (defn monitor-all-busses [e]
   (future
     (let [bm (all-bus-monitors)
-          v (fn [bm] (for [k (keys bm)] {:name k :val (deref (get bm k))}))
+          v (fn [bm]
+              (let [bo (map (fn [e] [e (get bm e)]) (get-buss-order @connections))]
+                (for [[k b] bo] {:name k :val (deref b)})))
           c [:name :val]
           t (table :model [:columns c :rows (v bm)])
           f (frame :title "Buss Monitor"
