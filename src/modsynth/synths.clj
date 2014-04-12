@@ -183,12 +183,12 @@
 
 (defsynth moog-filt
   [cutoff {:default B1 :def 300 :min 0 :max 4000 :step 1}
-   lpf-res {:default B2 :def 50 :min 0 :max 100 :step 1}
+   lpf-res {:default B2 :def 1 :min 0 :max 4 :step 1}
    obus OB
    ibus IB]
   (let [sig (in:ar ibus 2)
         c (* (in:kr cutoff 1) 40)
-        l (* (in:kr lpf-res 1) 0.01)]
+        l (* (in:kr lpf-res 1) 1)]
     (out obus (moog-ff sig c l))))
 
 (defsynth pct-add

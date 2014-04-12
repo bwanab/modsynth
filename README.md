@@ -13,7 +13,7 @@ A modular synth system somewhat along the lines of PD, but at a higher level of 
 
 ### What it still needs before it's usable:
 
-- [ ] Save/restore dialog
+- [x] Save/restore dialog
 - [x] save/restore needs to be better tested.
 - [x] Save values for sliders and const.
 - [x] Fix slider.
