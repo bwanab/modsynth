@@ -10,7 +10,7 @@
 
 (ns modsynth.core
   (:use [seesaw core border behave graphics color chooser table]
-        [modsynth.piano]
+        [modsynth piano join]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
             [clojure.string :as str]
@@ -656,7 +656,7 @@ Connections are references to two connection points
   ([p] (merge-paths (first p) (rest p)))
   ([acc r]
      (if (empty? r) acc
-         (merge-paths (merge-two-paths acc (first r)) (rest r)))))
+         (merge-paths (join-on-common acc (first r) get-node-name) (rest r)))))
 
 (defn get-order [n]
   "adds implied connections to existing connections n then gets

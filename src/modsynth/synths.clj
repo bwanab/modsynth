@@ -257,11 +257,12 @@
     (out obus (* env sig))))
 
 (defsynth amp
+  "provides a gain of 4x at max (100)"
   [obus OB
    ibus IB
    gain  {:default B1 :def 20 :min 0 :max 100 :step :1}]
   (let [sig (in:ar ibus 2)
-        g (* (in:kr gain 1) 0.01)]
+        g (* (in:kr gain 1) 0.04)]
     (out obus (* g sig))))
 
 (defsynth freeverb
