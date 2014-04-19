@@ -160,36 +160,9 @@
 (defn get-params [stype name]
   (first (filter #(= (:name %) name) (:params stype))))
 
-(defn connect-manual [from to]
-  (let [name (text (:point to))
-        t (keyword name)
-        from-synth (get-in from [:node :synth])  ;; from-synth is currently a slider widget
-        to-synth (get-in to [:node :synth])
-        p (get-params (get-in to [:node :synth-type]) name)
-        mn (:min p)
-        mx (:max p)
-        df (:default p)]
-    ;; (println "from=" from)
-    ;; (println "to=" to)
-    ;; (println "name=" name)
-    ;; (println "from-synth=" from-synth)
-    ;; (println "to-synth=" to-synth)
-    (config! from-synth :min mn :max mx :value df :paint-labels? true :paint-ticks? true)
-    (listen from-synth :change (fn [e] (s/sctl to-synth t (value from-synth))))))
-
 (defn make-synth [s]
   (println "make synth " (:name s))
   (let [synth (s)]
-    ;; (doseq [p (get-synth-controls s)]
-    ;;   (let [cnst (s/const)
-    ;;         in-point (first (filter #(= (:name %) p) (:params s)))
-    ;;         val (:def in-point)]
-    ;;     (future
-    ;;       (Thread/sleep 50)
-    ;;       (println "val = " val " p = " p " type val = " (type val))
-    ;;       (when val (let [c (s/connect-points cnst synth :control (keyword p) (str "default const -> " p))]
-    ;;                 (s/sctl cnst :ibus val)
-    ;;                 (swap! busses assoc (:name c) c))))))
     {:synth synth}))
 
 (defn get-node-name [node-name]
@@ -459,20 +432,6 @@ Connections are references to two connection points
 
 
 
-;;
-;;(def f (-main))              ; create frame
-;;(def m (midi-in 1))          ; add a midi-in
-;;(def o (saw-osc 1))          ; add a saw-osc
-;;(move! m :by [50 50])        ; move them on the frame
-;;(move! o :by [100 100])
-;;(def b1 (select f [:#midi-in1freq]))  ; get the two buttons we want to connect
-;;(def b2 (select f [:#saw-osc2freq]))
-;;(connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
-;;               {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
-;;(def mnode (modsynth.core.IONode. m b1 :control s/midi-in)) ; make IONode for midi-in/freq
-;;(def onode (modsynth.core.IONode. o b2 :freq s/saw-osc))    ; make IONode for saw-osc/freq
-;;(swap! connections conj [mnode onode]                       ; put them in connections which causes connection to draw
-
 (defn to-string [e]
   (write e :stream nil :pretty false))
 
@@ -542,29 +501,6 @@ Connections are references to two connection points
         b (select (:widget m) [(keyword (str "#" name))])]
     {:point b :node m}))
 
-(defn partition-with
-  "partitions all elements to two buckets where first contains elements in which pred is true
-   and the second contains the elements in which pred is false.
-
-   this is how I always think of partition-by working, but it has a different behavior."
-  [pred coll]
-  [(filter pred coll)
-   (filter (complement pred) coll)])
-
-(defn get-starts
-  "n is (:connections (load-file xxx.clj))"
-  [n]
-  (let [tos (into #{} (for [[f t] n] t))
-        m (filter #(not (contains? tos %)) (for [[f t] n] f))]
-
-    ;; we need the input nodes to be first in the chain
-    ;; (sort (fn [x y] (if (.contains x "-in:")
-    ;;                  -1
-    ;;                  (if (.contains y "-in:")
-    ;;                    -1
-    ;;                    (compare x y)))) m)
-    m))
-
 
 (defn get-ends
   "n is (:connections (load-file xxx.clj))"
@@ -611,54 +547,6 @@ Connections are references to two connection points
               b (k r)]
           (recur (rest c) (assoc r k (if b (vec (concat b [e])) [e])))))))
 
-(defn find-all-paths
-  [connection-map starts]
-  (for [s starts]
-    (let [p (iterate (fn [e] (second ((keyword e) connection-map))) s)]
-      (take-while #(not= nil %) p))))
-
-(defn find-all-paths
-  ([connections ends]
-     (let [a (atom [])]
-       (find-all-paths connections ends [] a)
-       @a))
-  ([connections ends acc a]
-     (if (empty? ends)
-       (swap! a conj acc)
-       (doseq [e ends]
-         (let [ne (filter #(.startsWith (name (second %)) (name e)) connections)]
-           (find-all-paths connections (map first ne) (cons e acc) a))))))
-
-(defn sort-paths
-  [connections ends]
-  (let [a (find-all-paths connections ends)
-        aa (map (fn [e] [(count e) e]) a)]
-    (sort (fn [x y] (if (> (first x) (first y)) -1 1)) aa)))
-
-(defn find-longest-path
-  [connection-map starts]
-  (let [a (sort-paths connection-map starts)]
-    (second (first a))))
-
-(defn merge-two-paths [p1 p2]
-  (let [ps (set p1)
-        pa (partition-with #(not (contains? ps %)) p2)]
-    (loop [nts (first pa) acc p1]
-      (do
-        ;;(println nts acc)
-        (if (empty? nts) acc
-           (let [n (first nts)
-                 wings (split-with #(not= (get-node-name %) (get-node-name n)) acc)]
-             (recur (rest nts) (flatten (if (empty? (second wings))
-                                          [n (first wings)]
-                                          [(first wings) n (second wings)])))))))))
-
-(defn merge-paths
-  ([p] (merge-paths (first p) (rest p)))
-  ([acc r]
-     (if (empty? r) acc
-         (merge-paths (join-on-common acc (first r) get-node-name) (rest r)))))
-
 (defn build-tree [cc e]
   (if (nil? e) nil
       (let [r (map first (filter #(= (second %) e) cc))]
@@ -668,19 +556,6 @@ Connections are references to two connection points
    (if (seq roots)
        (concat (map first roots) ;; values in roots
                (apply bf (mapcat rest roots)))))
-
-;; (defn get-order [n]
-;;   "adds implied connections to existing connections n then gets
-;;    all the points (i.e. every point on each node) in rough order
-;;    on the chain"
-;;   (let [c1 (add-implied-connections n)
-;;         c2 (for [n (get-ends c1)]
-;;              [n (keyword (str (get-node-name n) "-out"))]) ; adds implied end points
-;;         c (concat c1 c2)
-;;         p (sort-paths c (into #{} (map second c2)))
-;;         p1 (map second p)
-;;         p2 (map (fn [e] (filter #(not (and (.startsWith (name %) "audio") (not (.endsWith (name %) "-out")))) e)) p1)]
-;;     (reverse (distinct (reverse (merge-paths p2))))))
 
 (defn get-order [n]
   "adds implied connections to existing connections n then gets
@@ -717,17 +592,6 @@ Connections are references to two connection points
       (if-let [stop-fn (:stop-fn node)]
         (stop-fn)))))
 
-;; (defn test-modsynth []
-;;   (let [f (-main)
-;;         m (make-node "midi-in" 50 50)
-;;         o (make-node "saw-osc" 100 100)
-;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
-;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
-;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
-;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
-;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
-;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
-;;     (swap! connections conj [mnode onode])))
 
 (defn get-node-order [o]
   (distinct (map (comp keyword get-node-name) o)))
@@ -819,7 +683,9 @@ Connections are references to two connection points
      :size    [600 :by 600])))
 
 (defn bugger-what!
-  "for some reason, makes the frame show full size"
+  "for some reason, makes the frame show full size, sometimes
+   swing has a high astonishment factor
+  "
   [f]
   (if (= (java.awt.Dimension.) (.getSize f))
     (pack! f)
