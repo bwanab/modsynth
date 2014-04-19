@@ -17,22 +17,22 @@
 (def OB 2)
 (def OB1 OB)
 (def OB2 (inc OB))
-(def IB (+ OB 2))
-(def B1 (+ IB 2))
+(def IB (+ OB 1))
+(def B1 (+ IB 1))
 (def B2 (inc B1))
 (def B3 (inc B2))
 (def B4 (inc B3))
 
 (defsynth audio-out
   [obus 0
-   b1 B1
-   b2 B2]
+   b1 OB1
+   b2 OB2]
   (out obus [(in:ar b1 1) (in:ar b2 1) ]))
 
 (defsynth audio-in
   [obus OB
    ibus 0]
-  (out obus [(sound-in:ar ibus 2)]))
+  (out obus [(sound-in:ar ibus 1)]))
 
 (defsynth c-splitter
   [ob1 OB1
@@ -159,7 +159,7 @@
   [cutoff {:default B1 :def 300 :min 30 :max 4000 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         c (+ 30 (* (in:kr cutoff 1) 40))] ;; the input is 0-100, the out put must be 0-4000
     (out obus (lpf sig c))))
 
@@ -167,7 +167,7 @@
   [cutoff {:default B1 :def 1000 :min 0 :max 300 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         c (* (in:kr cutoff 1) 3)]
     (out obus (hpf sig c))))
 
@@ -176,7 +176,7 @@
    q {:default B2 :def 1 :min 1 :max 4 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         f (+ 100 (* (in:kr freq 1) 40))
         qq (+ 1 (* (in:kr q 1) 0.04))]
     (out obus (bpf sig f qq))))
@@ -186,7 +186,7 @@
    lpf-res {:default B2 :def 1 :min 0 :max 4 :step 1}
    obus OB
    ibus IB]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         c (* (in:kr cutoff 1) 40)
         l (* (in:kr lpf-res 1) 1)]
     (out obus (moog-ff sig c l))))
@@ -233,7 +233,7 @@
    release {:default B4 :def 30 :min 0 :max 100 :step 1}
    gate 1
    ]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         a (* (in:kr attack 1) 0.01)
         d (* (in:kr decay 1) 0.01)
         s (* (in:kr sustain 1) 0.01)
@@ -249,7 +249,7 @@
    release {:default B2 :def 30 :min 0 :max 100 :step 1}
    gate 1
    ]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         a (* (in:kr attack 1) 0.01)
         r (* (in:kr release 1) 0.01)
         env (env-gen (perc a r) gate)
@@ -261,7 +261,7 @@
   [obus OB
    ibus IB
    gain  {:default B1 :def 20 :min 0 :max 100 :step :1}]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         g (* (in:kr gain 1) 0.04)]
     (out obus (* g sig))))
 
@@ -272,7 +272,7 @@
    room-size    {:default B2 :def 30 :min 0 :max 100 :step 1}
    dampening    {:default B3 :def 30 :min 0 :max 100 :step 1}
    ]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         w (/ (in:kr wet-dry 1) 100.0)
         r (/ (in:kr room-size 1) 100.0)
         d (/ (in:kr dampening 1) 100.0)]
@@ -284,7 +284,7 @@
    ibus IB
    delay-time {:default B2 :def 20 :min 0 :max 100 :step 1}
    decay-time {:default B3 :def 20 :min 0 :max 100 :step 1}]
-  (let [sig (in:ar ibus 2)
+  (let [sig (in:ar ibus 1)
         max 5
         dlt (/ (in:kr delay-time 1) 20.0)
         dct (/ (in:kr decay-time 1) 20.0)
@@ -298,14 +298,14 @@
 
 (defn cbus [name] (control-bus 1 name))
 
-(defn abus [name]  (audio-bus 2 name))
+(defn abus [name]  (audio-bus 1 name))
 
 (defn connect-points
   ([n1 n2 ct c] (connect-points n1 n2 ct c "no-name" :obus))
   ([n1 n2 ct c name] (connect-points n1 n2 ct c name :obus))
   ([n1 n2 ct c name ob]
    (let [bus (if (= ct :audio) (abus name) (cbus name))]
-     (println "connect points: " bus n1 n2 ct c name ob)
+     ;;(println "connect points: " bus n1 n2 ct c name ob)
      (ctl n1 ob bus)
      (ctl n2 c bus)
      bus)))

@@ -212,8 +212,9 @@
        (connected? wid lid) (reset! connections (filter #(not= % [wid lid]) @connections))
        :else (let [lpn (get-node-name lid)
                    wpn (get-node-name wid)]
-               (when (not= lpn wpn)   ; don't connect points of same node
-                 (swap! connections conj [lid wid]))))
+               (do
+                 (when (not= lpn wpn) ; don't connect points of same node
+                   (swap! connections conj [lid wid])))))
       (swap! s-panel assoc :last-point  nil :changes-pending true))))
 
 "
@@ -608,7 +609,7 @@ Connections are references to two connection points
         (let [e (first c)
               k (first e)
               b (k r)]
-          (recur (rest c) (assoc r (first e) (if b (vec (concat b [e])) [e])))))))
+          (recur (rest c) (assoc r k (if b (vec (concat b [e])) [e])))))))
 
 (defn find-all-paths
   [connection-map starts]
@@ -658,13 +659,40 @@ Connections are references to two connection points
      (if (empty? r) acc
          (merge-paths (join-on-common acc (first r) get-node-name) (rest r)))))
 
+(defn build-tree [cc e]
+  (if (nil? e) nil
+      (let [r (map first (filter #(= (second %) e) cc))]
+        (cons e (for [ee r] (build-tree cc ee))))))
+
+(defn bf [& roots]
+   (if (seq roots)
+       (concat (map first roots) ;; values in roots
+               (apply bf (mapcat rest roots)))))
+
+;; (defn get-order [n]
+;;   "adds implied connections to existing connections n then gets
+;;    all the points (i.e. every point on each node) in rough order
+;;    on the chain"
+;;   (let [c1 (add-implied-connections n)
+;;         c2 (for [n (get-ends c1)]
+;;              [n (keyword (str (get-node-name n) "-out"))]) ; adds implied end points
+;;         c (concat c1 c2)
+;;         p (sort-paths c (into #{} (map second c2)))
+;;         p1 (map second p)
+;;         p2 (map (fn [e] (filter #(not (and (.startsWith (name %) "audio") (not (.endsWith (name %) "-out")))) e)) p1)]
+;;     (reverse (distinct (reverse (merge-paths p2))))))
+
 (defn get-order [n]
   "adds implied connections to existing connections n then gets
    all the points (i.e. every point on each node) in rough order
    on the chain"
-  (let [c (add-implied-connections n)
-        p (sort-paths c (get-ends c))]
-    (distinct (merge-paths (map second p)))))
+  (let [c1 (add-implied-connections n)
+        c2 (for [n (get-ends c1)]
+             [n (keyword (str (get-node-name n) "-out"))]) ; adds implied end points
+        c (concat c1 c2)
+        t (build-tree c (first (into #{} (map second c2))))]
+    (reverse (bf t))))
+
 
 (defn build-synths-and-connections
   [ordered-nodes connections make-new-connections]
@@ -674,7 +702,7 @@ Connections are references to two connection points
        (do
          (println n1 n2)
          (let [node1 (restore-node n1 @nodes)
-              node2 (restore-node n2 @nodes)]
+               node2 (restore-node n2 @nodes)]
           (if make-new-connections
             (do
               (make-connection n1 node1 n2 node2)
@@ -850,7 +878,8 @@ Connections are references to two connection points
   (swap! s-panel assoc :master-vol (:master-vol r))
   (let [f (-main)
         c (:connections r)
-        o (distinct (map (comp keyword get-node-name) (get-order c)))
+        oc (get-order c)
+        o (distinct (map (comp keyword get-node-name) oc))
         node-map (into {}  (for [n1 (:nodes r)] [(:w n1) n1]))
         r-make-node (fn [n] (let [s (str/split (name (:w n)) #":")
                                  wname (first s)
@@ -865,7 +894,7 @@ Connections are references to two connection points
         [(:w n) (r-make-node n)]))
     (doseq [n (filter #(.startsWith (get-node-name (:w %)) "doc") (:nodes r))]
       (r-make-node n))
-    (build-synths-and-connections (get-order c) c true)
+    (build-synths-and-connections (distinct oc) c true)
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil :changes-pending false))
 

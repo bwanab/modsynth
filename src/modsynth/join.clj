@@ -37,3 +37,10 @@
         res (join-on-common s1 s2)]
     (println res)
     (= res [:a :i :f :b :c :g :d :e :h])))
+
+(defn test-join-2 []
+  (let [s1 [:a :i :b :c :d :e :h]
+        s2 [:f :b :g :d :h]
+        res (join-on-common s1 s2)]
+    (println res)
+    (= res [:a :i :f :b :c :g :d :e :h])))
