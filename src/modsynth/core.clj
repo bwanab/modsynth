@@ -13,6 +13,7 @@
         [modsynth piano join]
         [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
+            [modsynth.midi :as m]
             [clojure.string :as str]
             [overtone.core :refer [ctl volume kill at now]]
             [overtone.studio.scope :refer [pscope]])
@@ -421,6 +422,14 @@ Connections are references to two connection points
                   {:synth synth :stop-fn unregister}))]
     (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
+(defn midi-in2 [e]
+  (let [id (get-id "midi-in2" e)
+        f (fn [] (let [synth (s/midi-in)]
+                  (do
+                    (m/register-note-events synth)
+                    {:synth synth})))]
+    (add-node :name id :output "freq" :out-type :control :play-fn f)))
+
 (defn piano-in [e]
   (let [id (get-id "piano-in" e)
         f (fn []  (let [synth (s/midi-in)
@@ -600,6 +609,7 @@ Connections are references to two connection points
   (s/svolume (:master-vol @s-panel))
   (swap! s-panel assoc :run-mode true)
   (let [ordered-nodes (get-order @connections)]
+    (m/init)
     (instantiate-synths (get-node-order ordered-nodes))
     (build-synths-and-connections ordered-nodes @connections false)))
 
@@ -654,6 +664,7 @@ Connections are references to two connection points
                                              (action :handler rand-pent :name "Random Pentatonic")
                                              (action :handler const :name "Const")
                                              (action :handler midi-in :name "Midi In")
+                                             (action :handler midi-in2 :name "Midi In 2")
                                              (action :handler note-in :name "Note In")
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
