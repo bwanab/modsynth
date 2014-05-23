@@ -430,6 +430,15 @@ Connections are references to two connection points
                     {:synth synth})))]
     (add-node :name id :output "freq" :out-type :control :play-fn f)))
 
+(defn cc-in [e]
+  (let [id (get-id "cc-in" e)
+        f (fn [] (let [synth (s/cc-in)]
+                  (do
+                    (m/register-continuous-cc-events synth 2)
+                    {:synth synth})))]
+    (add-node :name id :output "val" :out-type :control :play-fn f)))
+
+
 (defn piano-in [e]
   (let [id (get-id "piano-in" e)
         f (fn []  (let [synth (s/midi-in)
@@ -665,6 +674,7 @@ Connections are references to two connection points
                                              (action :handler const :name "Const")
                                              (action :handler midi-in :name "Midi In")
                                              (action :handler midi-in2 :name "Midi In 2")
+                                             (action :handler cc-in :name "CC In")
                                              (action :handler note-in :name "Note In")
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")

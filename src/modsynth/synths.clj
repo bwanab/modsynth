@@ -85,6 +85,11 @@
    ibus 0]
   (out obus (* ibus 1.0)))
 
+(defsynth cc-in
+  [obus OB
+   sig IB]
+  (out:kr obus sig))
+
 (defsynth midi-in
   [obus OB
    note 60]

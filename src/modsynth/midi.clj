@@ -5,7 +5,7 @@
   (:require [overtone.libs.event :as e]))
 
 (def event-registry (atom {}))
-(def last-note* (atom {:note* 24}))
+(def last-note* (atom {:note* 48}))
 (def profile {:device-key [:midi]
               :player-key ::yamaha-wx7
               :central-bend-point 78.0
@@ -23,13 +23,27 @@
 (defn register-pc-events [synth num]
   (swap! event-registry assoc-in [:pc num] synth))
 
+;; (defn control-vals [p amp]
+;;   (let [s (:symbol p)
+;;         val (+ (:offset p)
+;;                (* amp (:range p)))]
+;;     (fire-event s val)
+;;     [s val]))
+
+(defn control-vals [p amp]
+  ["sig" (* amp 100.0 )])
+
+(defn discreet-change [p]
+  42)
+
+
 (defn init []
   (let [device-key    (:device-key profile)
         player-key    (:player-key profile)
         central-bend-point (:central-bend-point profile)
-        bend-factor (:bend-factor profile)
+        bend-factor   (:bend-factor profile)
         on-event-key  (concat device-key [:note-on])
-        off-event-key  (concat device-key [:note-off])
+        ;;off-event-key  (concat device-key [:note-off])
         pb-event-key  (concat device-key [:pitch-bend])
         cc-event-key  (concat device-key [:control-change])
         pc-event-key  (concat device-key [:program-change])
@@ -39,30 +53,29 @@
         pc-key        (concat [player-key] pc-event-key)]
     (reset! event-registry {})
     "note-on events send the new note to the synth and save that as the last-note played"
-    ;; (e/on-event
-    ;;  on-event-key
-    ;;  (fn [{note :note-on velocity :velocity}]
-    ;;    (println note " " velocity)
-    ;;    (if-let [synth (get-in  @event-registry [:note :synth])]
-    ;;      (let [amp (float (/ velocity 127))]
-    ;;        (with-inactive-node-modification-error :silent
-    ;;          (node-control synth [:note note :amp amp :velocity velocity]))
-    ;;        (swap! last-note* assoc
-    ;;               :note* note))))
-    ;;  on-key)
+    (e/on-event
+     on-event-key
+     (fn [{note :note velocity :velocity}]
+       (if-let [synth (get-in  @event-registry [:note :synth])]
+         (let [amp (float (/ velocity 127))]
+           (with-inactive-node-modification-error :silent
+             (node-control synth [:note note :amp amp :velocity velocity]))
+           (swap! last-note* assoc
+                  :note* note))))
+     on-key)
 
     "TODO: off event isn't needed since the wx7 is at rest unless I'm blowing - this isn't the
 case for keyboard and other input and I'll need to deal with that"
 
-    (e/on-event
-     off-event-key
-     (fn [{note :note velocity :velocity}]
-       (if-let [synth (get-in @event-registry [:note :synth])]
-         (with-inactive-node-modification-error :silent
-           (node-control synth [:note note :amp 0 :velocity 0]))
-         (swap! last-note* assoc
-                :note* note)))
-     on-key)
+    ;; (e/on-event
+    ;;  off-event-key
+    ;;  (fn [{note :note velocity :velocity}]
+    ;;    (if-let [synth (get-in @event-registry [:note :synth])]
+    ;;      (with-inactive-node-modification-error :silent
+    ;;        (node-control synth [:note note :amp 0 :velocity 0]))
+    ;;      (swap! last-note* assoc
+    ;;             :note* note)))
+    ;;  on-key)
 
     "pitch-bend events mutate the the note that the synth is playing. bend-factor
 and central-bend-point are specified in a separate profile for the specific device.
@@ -87,20 +100,21 @@ last-note is note affected until a new note-on event occurs.
     "control change events are interpreted based on the midi-map (see test-wx7 for examples).
 All assigned control change events fire events of their own that are used by monitor to
 display the current state"
-    ;; (e/on-event
-    ;;  cc-event-key
-    ;;  (fn [{cc :note velocity :velocity}]
-    ;;    (when-let [p (get-in @event-registry cc)]
-    ;;      (try
-    ;;        (let [amp (float (/ velocity 127))]
-    ;;          (with-inactive-node-modification-error :silent
-    ;;            (node-control (:synth p)
-    ;;                          (case (:type p)
-    ;;                            :continuous (control-vals p amp)
-    ;;                            :discreet (discreet-change p)))))
-    ;;        (catch Exception e (println "unexpected cc: " cc))))
-    ;;    )
-    ;;  cc-key)
+    (e/on-event
+     cc-event-key
+     (fn [{cc :note velocity :velocity}]
+       (println "cc n/v " cc velocity )
+       (when-let [p (get-in @event-registry [:cc cc])]
+         (try
+           (let [amp (float (/ velocity 127))]
+             (with-inactive-node-modification-error :silent
+               (node-control (:synth p)
+                             (case (:type p)
+                               :continuous (control-vals p amp)
+                               :discreet (discreet-change p)))))
+           (catch Exception e (println "unexpected cc: " cc))))
+       )
+     cc-key)
 
     "program change events can be used if necessary, but it would be best not to use them to control
 the player. They should be reserved for specifying what synth is currently running at a higher level (see

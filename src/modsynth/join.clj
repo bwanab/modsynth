@@ -2,7 +2,84 @@
 
 (defn find-common
   [s1 s2]
-  (for [t1 s1 t2 s2 :when (= t1 t2)] t1))
+  (for [t1 s1 t2 s2 :when (= ;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+;; (defn test-modsynth []
+;;   (let [f (-main)
+;;         m (make-node "midi-in" 50 50)
+;;         o (make-node "saw-osc" 100 100)
+;;         b1 (select f [(keyword (str "#" (name (id-of m)) "-" "freq"))])
+;;         b2 (select f [(keyword (str "#" (name (id-of o)) "-" "freq"))])
+;;         mnode (modsynth.core.IONode. m b1 :control s/midi-in)
+;;         onode (modsynth.core.IONode. o b2 :freq s/saw-osc)]
+;;     (connect-points {:node (get @synths (name (id-of m))) :type (button-type b1) :out-type :control}  ;connect the synths
+;;                    {:node (get @synths (name (id-of o))) :type (button-type b2) :out-type :audio})
+;;     (swap! connections conj [mnode onode])))
+t1 t2)] t1))
 
 (defn longer-first
   [s1 s2]
