@@ -14,10 +14,19 @@
 (defn register-note-events [synth]
   (swap! event-registry assoc-in [:note :synth] synth))
 
-(defn register-discreet-cc-events [synth num]
-  (swap! event-registry assoc-in [:cc num] {:type :discreet :synth synth}))
+(defn register-discreet-cc-events
+  "wf is a write function that will be invoked for changes
+   num is a compound number in which the hundreds represent the cc and the ones/tens
+       represent the maximum value the event can fire
+   and yes this is extreme hackage"
+  [synth num wf rf]
+  (let [cc-num (int (/ num 100))
+        cc-max (rem num 100)]
+    (println "register discreet cc num " cc-num " max val " cc-max)
+    (swap! event-registry assoc-in [:cc cc-num] {:type :discreet :synth synth :write-fun wf :read-fun rf :max cc-max :current 0})))
 
-(defn register-continuous-cc-events [synth num]
+(defn register-continuous-cc-events
+  [synth num]
   (swap! event-registry assoc-in [:cc num] {:type :continuous :synth synth}))
 
 (defn register-pc-events [synth num]
@@ -34,7 +43,13 @@
   ["ibus" (* amp 100.0 )])
 
 (defn discreet-change [p]
-  42)
+  (let [wf (:write-fun p)
+        rf (:read-fun p)
+        max (:max p)
+        c (inc (rf))
+        val (if (> c max) 0 c)]
+    (wf val)
+    ["ibus" val]))
 
 
 (defn init []

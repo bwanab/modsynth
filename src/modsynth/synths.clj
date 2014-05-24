@@ -85,7 +85,7 @@
    ibus 0]
   (out obus (* ibus 1.0)))
 
-(defsynth cc-cont-in
+(defsynth cc-in
   [obus OB
    ibus IB]
   (out:kr obus ibus))

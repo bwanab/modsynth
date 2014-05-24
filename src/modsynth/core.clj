@@ -433,7 +433,7 @@ Connections are references to two connection points
 (defn cc-cont-in [e]
   (let [id (get-id "cc-cont-in" e)
         t (text :text "  " :columns 2 :id (str id "-text"))
-        f (fn [] (let [synth (s/cc-cont-in)
+        f (fn [] (let [synth (s/cc-in)
                       v (text t)
                       unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
                   (do
@@ -441,6 +441,26 @@ Connections are references to two connection points
                       (m/register-continuous-cc-events synth (read-string v)))
                     {:synth synth :stop-fn unregister})))]
     (add-node :name id :output "val" :out-type :control :play-fn f :cent t)))
+
+(defn disc-panel [id]
+  (let  [t (text :text "  " :columns 2 :id (str id "-text"))
+         l (label :text "0")
+         p (border-panel :center t :south l)]
+    [t l p]))
+
+(defn cc-disc-in [e]
+  (let [id (get-id "cc-disc-in" e)
+        [t l p] (disc-panel id)
+        wf (fn [v] (config! l :text (str v)))
+        rf (fn [] (int (read-string (config l :text))))
+        f (fn [] (let [synth (s/cc-in)
+                      v (text t)
+                      unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
+                  (do
+                    (if (not (empty? (str/trim v)))
+                      (m/register-discreet-cc-events synth (read-string v) wf rf))
+                    {:synth synth :stop-fn unregister})))]
+    (add-node :name id :output "val" :out-type :control :play-fn f :cent p)))
 
 
 (defn piano-in [e]
@@ -679,6 +699,7 @@ Connections are references to two connection points
                                              (action :handler midi-in :name "Midi In")
                                              (action :handler midi-in2 :name "Midi In 2")
                                              (action :handler cc-cont-in :name "CC Continuous")
+                                             (action :handler cc-disc-in :name "CC Discreet")
                                              (action :handler note-in :name "Note In")
                                              (action :handler piano-in :name "Piano In")
                                              (action :handler lp-filt :name "LP Filt")
