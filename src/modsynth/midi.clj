@@ -31,7 +31,7 @@
 ;;     [s val]))
 
 (defn control-vals [p amp]
-  ["sig" (* amp 100.0 )])
+  ["ibus" (* amp 100.0 )])
 
 (defn discreet-change [p]
   42)
