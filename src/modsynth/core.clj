@@ -443,7 +443,7 @@ Connections are references to two connection points
     (add-node :name id :output "val" :out-type :control :play-fn f :cent t)))
 
 (defn disc-panel [id]
-  (let  [t (text :text "  " :columns 2 :id (str id "-text"))
+  (let  [t (text :text "  " :columns 4 :id (str id "-text"))
          l (label :text "0")
          p (border-panel :center t :south l)]
     [t l p]))
