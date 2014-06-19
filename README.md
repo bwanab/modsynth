@@ -9,6 +9,9 @@ A modular synth system somewhat along the lines of PD, but at a higher level of 
 (-main)
 ```
 
+The gui is more or less self contained. 
+There are a number of examples. One that gives an idea and doesn't require any user interaction is rand-pend-splitter-example.oms.
+
 ## Roadmap
 
 ### What it still needs before it's usable:
