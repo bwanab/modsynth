@@ -411,8 +411,8 @@ Connections are references to two connection points
   (doseq [gated-synth @gated-synths]
     (s/sctl gated-synth :gate 0)))
 
-(defn midi-in [e]
-  (let [id (get-id "midi-in" e)
+(defn midi-in2 [e]
+  (let [id (get-id "midi-in2" e)
         t (text :text "" :columns 1)
         f (fn [] (let [synth (s/midi-in)
                       unregister (listen t :key-pressed (fn [e]
@@ -422,8 +422,8 @@ Connections are references to two connection points
                   {:synth synth :stop-fn unregister}))]
     (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
-(defn midi-in2 [e]
-  (let [id (get-id "midi-in2" e)
+(defn midi-in [e]
+  (let [id (get-id "midi-in" e)
         f (fn [] (let [synth (s/midi-in)]
                   (do
                     (m/register-note-events synth)
