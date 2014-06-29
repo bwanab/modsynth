@@ -267,7 +267,7 @@
    ibus IB
    gain  {:default B1 :def 20 :min 0 :max 100 :step :1}]
   (let [sig (in:ar ibus 1)
-        g (* (in:kr gain 1) 0.04)]
+        g (* (in:kr gain 1) 0.1)]
     (out obus (* g sig))))
 
 (defsynth freeverb
