@@ -674,7 +674,8 @@ Connections are references to two connection points
     :items []
     ))
 
-(declare ms-load-file
+(declare ms-new
+         ms-load-file
          ms-save-file
          ms-save-file-as
          ms-load-example
@@ -685,7 +686,8 @@ Connections are references to two connection points
     (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
     (frame
      :menubar (menubar :items [(menu :text "File"
-                                     :items [(action :handler ms-load-file :name "Load File")
+                                     :items [(action :handler ms-new :name "New")
+                                             (action :handler ms-load-file :name "Load File")
                                              (action :handler ms-load-example :name "Load Example")
                                              (action :handler ms-save-file :name "Save File")
                                              (action :handler ms-save-file-as :name "Save File As")
@@ -702,6 +704,7 @@ Connections are references to two connection points
                                                            (action :handler cc-disc-in :name "CC Discreet")
                                                            (action :handler note-in :name "Note In")
                                                            (action :handler piano-in :name "Piano In")
+                                                           (action :handler audio-out :name "Audio Out")
                                                            ])
                                              (menu :text "Oscillators"
                                                    :items [(action :handler saw-osc :name "Saw Osc")
@@ -824,6 +827,11 @@ Connections are references to two connection points
     (build-synths-and-connections (distinct oc) c true)
     (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil :changes-pending false))
+
+(defn ms-new
+  [e]
+  (hide! (:frame @s-panel))
+  (-main))
 
 (defn ms-load-example [e]
   (ms-load-file e "./examples"))
