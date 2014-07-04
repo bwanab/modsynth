@@ -29,6 +29,7 @@
 (def gated-synths (atom #{}))
 (def busses (atom {}))
 
+(def color-const "#FFFFAA")
 (def color-control "#AAFFFF")
 (def color-audio "#FFBBFF")
 
@@ -213,7 +214,8 @@ Connections are references to two connection points
           ins  (make-io io :input id otype)
           outs  (make-io io :output id otype)
           gated (has-gate (:synth-type io))
-          color (if (= (:out-type io) :control) color-control color-audio)
+          color (if (.startsWith id "const") color-const
+                    (if (= (:out-type io) :control) color-control color-audio))
           node (assoc io :widget (doto (border-panel :id id
                                                      :border (line-border :top 1 :color color)
                                                      :north (label :text id :background color :h-text-position :center)
