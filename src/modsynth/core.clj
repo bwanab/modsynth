@@ -664,7 +664,8 @@ Connections are references to two connection points
   (reset! points {})
   (reset! nodes {})
   (reset! busses {})
-  (reset! next-id 0))
+  (reset! next-id 0)
+  (reset! s-panel {}))
 
 (defn make-panel []
   (xyz-panel
@@ -805,6 +806,7 @@ Connections are references to two connection points
 "
   [r]
   (ms-reset!)
+  (println "s-panel type is " (type @s-panel))
   (swap! s-panel assoc :master-vol (:master-vol r))
   (let [f (-main)
         c (:connections r)

@@ -93,8 +93,7 @@
 (defsynth midi-in
   [obus OB
    note 60]
-  (let [freq (midicps note)]
-    (out:kr obus freq)))
+  (out:kr obus note))
 
 (defsynth note-in
   [obus OB
