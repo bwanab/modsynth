@@ -29,7 +29,7 @@
 (def gated-synths (atom #{}))
 (def busses (atom {}))
 
-(def color-const "#FFFFAA")
+(def color-const "#EEEEAA")
 (def color-control "#AAFFFF")
 (def color-audio "#FFBBFF")
 
@@ -325,6 +325,11 @@ Connections are references to two connection points
         f (fn [] (make-synth s/pct-add))]
     (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
 
+(defn mult [e]
+  (let [id (get-id "mult" e)
+        f (fn [] (make-synth s/mult))]
+    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/mult) ))
+
 (defn val-add [e]
   (let [id (get-id "val-add" e)
         f (fn [] (make-synth s/val-add))]
@@ -345,10 +350,10 @@ Connections are references to two connection points
         f (fn []  (make-synth s/rand-pent))]
     (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
 
-(defn note-in [e]
-  (let [id (get-id "note-in" e)
-        f (fn []  (make-synth s/note-in))]
-    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/note-in)))
+(defn note-freq [e]
+  (let [id (get-id "note-freq" e)
+        f (fn []  (make-synth s/note-freq))]
+    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/note-freq)))
 
 (defn audio-out [e]
   (let [id (get-id "audio-out" e)
@@ -385,7 +390,9 @@ Connections are references to two connection points
         t (text :text "     " :columns 5 :id (str id "-text"))
         f (fn [] (let [synth (s/const)
                       v (text t)
-                      unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
+                      unregister (do (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))
+                                     ;;(listen t :mouse-down (fn [e] (let [v (read-string (text t))])))
+                                     )]
                   (if (not (empty? (str/trim v)))
                     (s/sctl synth :ibus (read-string v)))
                   {:synth synth :stop-fn unregister}))]
@@ -606,6 +613,14 @@ Connections are references to two connection points
        (concat (map first roots) ;; values in roots
                (apply bf (mapcat rest roots)))))
 
+(defn remove-dups [vals]
+  (loop [v vals s #{} acc []]
+    (if (empty? v) (reverse acc)
+        (let [[f & r] v]
+          (if (not (contains? s f))
+            (recur r (conj s f) (cons f acc))
+            (recur r s acc))))))
+
 (defn get-order [n]
   "adds implied connections to existing connections n then gets
    all the points (i.e. every point on each node) in rough order
@@ -615,7 +630,7 @@ Connections are references to two connection points
              [n (keyword (str (get-node-name n) "-out"))]) ; adds implied end points
         c (concat c1 c2)
         t (build-tree c (first (into #{} (map second c2))))]
-    (reverse (bf t))))
+    (remove-dups (reverse (bf t)))))
 
 
 (defn build-synths-and-connections
@@ -705,7 +720,7 @@ Connections are references to two connection points
                                                            (action :handler midi-in2 :name "Midi In 2")
                                                            (action :handler cc-cont-in :name "CC Continuous")
                                                            (action :handler cc-disc-in :name "CC Discreet")
-                                                           (action :handler note-in :name "Note In")
+                                                           (action :handler note-freq :name "Note Freq")
                                                            (action :handler piano-in :name "Piano In")
                                                            (action :handler audio-out :name "Audio Out")
                                                            ])
@@ -736,6 +751,7 @@ Connections are references to two connection points
                                              (menu :text "Control"
                                                    :items [(action :handler pct-add :name "Pct Add")
                                                            (action :handler val-add :name "Val Add")
+                                                           (action :handler mult :name "Multiply")
                                                            (action :handler slider-ctl :name "Slider")
                                                            (action :handler c-splitter :name "Control Splitter")                                                           ])
                                              (menu :text "Miscellaneous"

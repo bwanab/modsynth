@@ -95,7 +95,7 @@
    note 60]
   (out:kr obus note))
 
-(defsynth note-in
+(defsynth note-freq
   [obus OB
    note IB]
   (let [freq (midicps (in:kr note 1))]
@@ -194,6 +194,13 @@
         c (* (in:kr cutoff 1) 40)
         l (* (in:kr lpf-res 1) 1)]
     (out obus (moog-ff sig c l))))
+
+(defsynth mult
+  [obus OB
+   ibus IB
+   gain  {:default B1 :def 50 :min 0 :max 100 :step :1}]
+  (let [sig (in:kr ibus 1)]
+    (out obus (* sig (in:kr gain 1)))))
 
 (defsynth pct-add
   "50 = 0%, 0 = -50%, 100= +50%"
