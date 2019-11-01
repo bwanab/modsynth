@@ -4,7 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :main modsynth.core
-  :dependencies [[org.clojure/clojure "1.5.1"]
-                 [seesaw "1.4.4"]
-                 [overtone "0.10-SNAPSHOT"]
-                 [leipzig "0.7.0"]])
+  :dependencies [[org.clojure/clojure "1.10.0"]
+                 [seesaw "1.5.0"]
+                 [overtone "0.10.6"]
+                 [leipzig "0.10.0"]])

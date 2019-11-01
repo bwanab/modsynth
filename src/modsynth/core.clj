@@ -99,7 +99,7 @@
              w2 (get @points id2)
              color (if (= (get-in @points [id1 :node :out-type]) :control) color-control color-audio)
              [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
-         ;(println x1 y1 x2 y2)
+         (println x1 y1 x2 y2)
          (.setColor g (Color/decode color))
          (.drawLine g x1 y1 x2 y2)))
      (.setColor g cur-color)
@@ -345,10 +345,10 @@ Connections are references to two connection points
         f (fn []  (make-synth s/rand-in))]
     (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-in)))
 
-(defn rand-pent [e]
-  (let [id (get-id "rand-pent" e)
-        f (fn []  (make-synth s/rand-pent))]
-    (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
+;; (defn rand-pent [e]
+;;   (let [id (get-id "rand-pent" e)
+;;         f (fn []  (make-synth s/rand-pent))]
+;;     (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
 
 (defn note-freq [e]
   (let [id (get-id "note-freq" e)
@@ -754,11 +754,12 @@ Connections are references to two connection points
                                                            (action :handler mult :name "Multiply")
                                                            (action :handler slider-ctl :name "Slider")
                                                            (action :handler c-splitter :name "Control Splitter")                                                           ])
-                                             (menu :text "Miscellaneous"
-                                                   :items [(action :handler rand-in :name "Random Val")
-                                                           (action :handler rand-pent :name "Random Pentatonic")
-                                                           (action :handler const :name "Const")
-                                                           (action :handler doc-node :name "Doc Node")])])])
+                                             ;; (menu :text "Miscellaneous"
+                                             ;;       :items [(action :handler rand-in :name "Random Val")
+                                             ;;               (action :handler rand-pent :name "Random Pentatonic")
+                                             ;;               (action :handler const :name "Const")
+                                             ;;               (action :handler doc-node :name "Doc Node")])
+                                             ])])
      :title   "Overtone Modular Synth"
      :content (border-panel
                :vgap 5

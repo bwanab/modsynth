@@ -101,17 +101,17 @@
   (let [freq (midicps (in:kr note 1))]
     (out:kr obus freq)))
 
-(defonce index-buffer
-  (let [buf (buffer 128)
-        data (take-while #(< % 100) (drop-while #(> % 30) (scale-field :a :pentatonic)))]
-    (doseq [[idx val] (map-indexed (fn [a b] [a b]) data)]
-      (buffer-set! buf idx val))
-    buf))
+;; (defonce index-buffer
+;;   (let [buf (buffer 128)
+;;         data (take-while #(< % 100) (drop-while #(> % 30) (scale-field :a :pentatonic)))]
+;;     (doseq [[idx val] (map-indexed (fn [a b] [a b]) data)]
+;;       (buffer-set! buf idx val))
+;;     buf))
 
-(defsynth rand-pent
-  [obus OB
-   ibus IB]
-  (out:kr obus (index:kr index-buffer (in:kr ibus 1))))
+;; (defsynth rand-pent
+;;   [obus OB
+;;    ibus IB]
+;;   (out:kr obus (index:kr index-buffer (in:kr ibus 1))))
 
 (defsynth saw-osc
   [obus OB
