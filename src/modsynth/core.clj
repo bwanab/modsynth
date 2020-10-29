@@ -94,7 +94,7 @@
       (.drawLine g x 0 x h))
     (doseq [y (range 0 h 10)]
       (.drawLine g 0 y w y))
-     (doseq [[id1 id2] @connections]
+    (doseq [[id1 id2] @connections]
        (let [w1 (get @points id1)
              w2 (get @points id2)
              color (if (= (get-in @points [id1 :node :out-type]) :control) color-control color-audio)
@@ -345,10 +345,10 @@ Connections are references to two connection points
         f (fn []  (make-synth s/rand-in))]
     (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-in)))
 
-;; (defn rand-pent [e]
-;;   (let [id (get-id "rand-pent" e)
-;;         f (fn []  (make-synth s/rand-pent))]
-;;     (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
+(defn rand-pent [e]
+  (let [id (get-id "rand-pent" e)
+        f (fn []  (make-synth s/rand-pent))]
+    (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
 
 (defn note-freq [e]
   (let [id (get-id "note-freq" e)
@@ -493,8 +493,9 @@ Connections are references to two connection points
 
 (defn get-value-field
   [w kw]
-  (if-let [w (select w [(keyword (str "#" (name kw) "-text"))])]
-    (if (or (nil? w) (empty? (str/trim w))) nil w)))
+  (let [nkw (keyword (str "#" (name kw) "-text"))]
+    (if-let [cw (select w [nkw])]
+      (if (nil? cw) nil cw))))
 
 (defn get-if-value
   [w kw]
