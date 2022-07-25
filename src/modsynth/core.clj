@@ -9,18 +9,14 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns modsynth.core
-  (:use [seesaw core border behave graphics color chooser table]
-        [modsynth piano join]
-        [clojure.pprint :only [write]])
+  (:use     [clojure.pprint :only [write]])
   (:require [modsynth.synths :as s]
             [modsynth.midi :as m]
             [clojure.string :as str]
             [overtone.core :refer [ctl volume kill at now]]
-            [overtone.studio.scope :refer [pscope]])
-  (:import [javax.swing SwingUtilities]
-           [java.awt Color]))
+            [overtone.studio.scope :refer [pscope]]))
 
-(native!)
+; (native!)
 (def s-panel (atom {}))
 (def next-id (atom 0))
 (def nodes (atom {}))
@@ -28,10 +24,6 @@
 (def connections (atom []))
 (def gated-synths (atom #{}))
 (def busses (atom {}))
-
-(def color-const "#EEEEAA")
-(def color-control "#AAFFFF")
-(def color-audio "#FFBBFF")
 
 (s/svolume 0.0)
 
@@ -42,68 +34,7 @@
   (doseq [k (keys bmg)] (println k ":" (deref (get bmg k)))))
 
 
-; Put in some basic support for moving w around using behave/when-mouse-dragged.
-(defn movable [w]
-  (let [start-point (java.awt.Point.)]
-    (when-mouse-dragged w
-      ; When the mouse is pressed, move the widget to the front of the z order
-      :start (fn [e]
-                (move! e :to-front)
-                (.setLocation start-point (.getPoint e)))
-      ; When the mouse is dragged move the widget
-      ; Unfortunately, the delta passed to this function doesn't work correctly
-      ; if the widget is moved during the drag. So, the move is calculated
-      ; manually.
-      :drag (fn [e _]
-              (let [p (.getPoint e)]
-                (move! e :by [(- (.x p) (.x start-point))
-                              (- (.y p) (.y start-point))])))))
-  w)
 
-
-(defn button-type [b]
-  (keyword (first (config b :class))))
-
-(defn get-io-width-adjustment [w b]
-  (if (= :output (button-type b))
-    (int (.getWidth w) )
-    0))
-
-(defn get-io-height-adjustment [b]
-  (int (* 1 (.getHeight (config b :size)))))
-
-(defn getXY
-  "return int values for x and y for a widget"
-  [w]
-  (let [widget (get-in w [:node :widget])
-        b (:point w)
-        ;; ew (:wa w)
-        ;; eh (:ha w)
-        ew (get-io-width-adjustment widget b)
-        eh (get-io-height-adjustment b)
-        wp (config widget :location)
-        bp (config b :location)]
-    [(int (+ ew (.getX wp) (.getX bp)))
-     (int (+ eh (.getY wp) (.getY bp)))])
-  )
-
-(defn draw-grid [c g]
-  (let [w (width c) h (height c)
-        cur-color (.getColor g)]
-    (doseq [x (range 0 w 10)]
-      (.drawLine g x 0 x h))
-    (doseq [y (range 0 h 10)]
-      (.drawLine g 0 y w y))
-    (doseq [[id1 id2] @connections]
-       (let [w1 (get @points id1)
-             w2 (get @points id2)
-             color (if (= (get-in @points [id1 :node :out-type]) :control) color-control color-audio)
-             [x1 y1 x2 y2] (concat (getXY w1) (getXY w2))]
-         (println x1 y1 x2 y2)
-         (.setColor g (Color/decode color))
-         (.drawLine g x1 y1 x2 y2)))
-     (.setColor g cur-color)
-    ))
 
 (defn get-synth-controls [s]
   (filter #(not (contains? #{"obus" "ibus" "gate"} %)) (map :name (:params s))))
@@ -117,30 +48,6 @@
   (if (= t :input)
     (filter #(not (contains? #{"ob1" "ob2" "ibus"} %)) (map :name (:params s)))
     (filter #(contains? #{"ob1" "ob2"} %) (map :name (:params s)))))
-
-(defn make-io
-  [io t node-id otype]
-  ;;(println t otype)
-  (if (= otype :split) ; special case code for splitters
-    (if (= t :input)
-      (cons (button :text "in" :class t :id (str node-id "-in"))
-            (for [c (get-split-controls (:synth-type io) :input)]
-              (button :text c :class t :id (str node-id "-" c))))
-      (for [c (get-split-controls (:synth-type io) :output)]
-        (button :text c :class t :id (str node-id "-" c))))
-    (let [m (when-let [b (get io t)]
-              (button :text b :class t :id (str node-id "-" b)))
-          r (when (or (= t :input))
-              (for [c (get-synth-controls (:synth-type io))]
-                (button :text c :class t :id (str node-id "-" c))))]
-      (if m
-        (cons m r)
-        (if r r [])))))
-
-(defn get-point-name [point]
-  (let [n (:node point)
-        p (:point point)]
-    (str (:name n) "-" (text p))))
 
 (defn get-synths [in out]
   (let [win (:node in)
@@ -204,216 +111,171 @@ Each connection point is a button of a node that represents some parameter of th
 Connections are references to two connection points
 "
 
-(defn add-node [& ps]
-  (if (:run-mode @s-panel)
-    (alert "no editing while sound on")
-    (let [io (apply hash-map ps)
-          id (:name io)
-          kw (keyword id)
-          otype (:output io)
-          ins  (make-io io :input id otype)
-          outs  (make-io io :output id otype)
-          gated (has-gate (:synth-type io))
-          color (if (.startsWith id "const") color-const
-                    (if (= (:out-type io) :control) color-control color-audio))
-          node (assoc io :widget (doto (border-panel :id id
-                                                     :border (line-border :top 1 :color color)
-                                                     :north (label :text id :background color :h-text-position :center)
-                                                     :center (if (= nil (:cent io)) (label "") (:cent io))
-                                                     :east (grid-panel :rows (count outs) :columns 1 :items outs)
-                                                     :west (grid-panel :rows (count ins) :columns 1 :items ins)
-                                                     )
-                                   (config! :bounds :preferred)
-                                   movable)
-                      :id kw :inputs ins :outputs outs :gated gated)]
-      ;;(println "add node " id)
-      (swap! nodes assoc kw node)
-      (swap! s-panel assoc :changes-pending true)
-      (doseq [b (concat ins outs)]
-        (let [wpoint {:point b :node node}
-              wid (config b :id)]
-          (swap! points assoc wid wpoint)
-          (listen b :action
-                  (fn [e]
-                    (if-let [lid (:last-point @s-panel)]
-                      (let [lpoint (get @points lid)]
-                        (make-connection lid lpoint wid wpoint)
-                        (let [lp (:point lpoint)
-                              bc (default-color "Button.background")]
-                          ;;(println "lp = " lp " bc = " bc)
-                          (config! lp :background bc)))
-                      (do
-                        (swap! s-panel assoc :last-point wid)
-                        (config! b :background :blue)))))))
-      (config! (:panel @s-panel)
-               :items (conj (config (:panel @s-panel) :items)
-                            (:widget node)))
-      node)))
 
-(defn get-id [t e]
-  (let [id (if (number? e) e (swap! next-id inc))]
-    (str t ":" id)))
+;; (defn get-id [t e]
+;;   (let [id (if (number? e) e (swap! next-id inc))]
+;;     (str t ":" id)))
 
-(defn kill-synth [n]
-  (if-let [synth (:synth n)]
-    (s/skill synth)))
+;; (defn kill-synth [n]
+;;   (if-let [synth (:synth n)]
+;;     (s/skill synth)))
 
-(defn- osc [name synth-type]
-  (let [f (fn [] (make-synth synth-type))]
-    (add-node :name name :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type synth-type )))
+;; (defn- osc [name synth-type]
+;;   (let [f (fn [] (make-synth synth-type))]
+;;     (add-node :name name :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type synth-type )))
 
-(defn saw-osc [e]
-  (let [id (get-id "saw-osc" e)]
-    (osc id s/saw-osc)))
+;; (defn saw-osc [e]
+;;   (let [id (get-id "saw-osc" e)]
+;;     (osc id s/saw-osc)))
 
-(defn square-osc [e]
-  (let [id (get-id "square-osc" e)
-        f (fn [] (make-synth s/square-osc))]
-    (add-node :name id :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type s/square-osc)))
+;; (defn square-osc [e]
+;;   (let [id (get-id "square-osc" e)
+;;         f (fn [] (make-synth s/square-osc))]
+;;     (add-node :name id :play-fn f :input "freq" :output "sig" :out-type :audio :synth-type s/square-osc)))
 
-(defn sin-osc [e]
-  (let [id (get-id "sin-osc" e)]
-    (osc id s/s_sin-osc)))
+;; (defn sin-osc [e]
+;;   (let [id (get-id "sin-osc" e)]
+;;     (osc id s/s_sin-osc)))
 
-(defn lp-filt [e]
-  (let [id (get-id "lp-filt" e)
-        f (fn [] (make-synth s/lp-filt))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/lp-filt )))
+;; (defn lp-filt [e]
+;;   (let [id (get-id "lp-filt" e)
+;;         f (fn [] (make-synth s/lp-filt))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/lp-filt )))
 
-(defn hp-filt [e]
-  (let [id (get-id "hp-filt" e)
-        f (fn [] (make-synth s/hp-filt))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/hp-filt) ))
+;; (defn hp-filt [e]
+;;   (let [id (get-id "hp-filt" e)
+;;         f (fn [] (make-synth s/hp-filt))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/hp-filt) ))
 
-(defn bp-filt [e]
-  (let [id (get-id "bp-filt" e)
-        f (fn [] (make-synth s/bp-filt))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/bp-filt) ))
+;; (defn bp-filt [e]
+;;   (let [id (get-id "bp-filt" e)
+;;         f (fn [] (make-synth s/bp-filt))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/bp-filt) ))
 
-(defn moog-filt [e]
-  (let [id (get-id "moog-filt" e)
-        f (fn [] (make-synth s/moog-filt))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
+;; (defn moog-filt [e]
+;;   (let [id (get-id "moog-filt" e)
+;;         f (fn [] (make-synth s/moog-filt))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/moog-filt) ))
 
-(defn freeverb [e]
-  (let [id (get-id "freeverb" e)
-        f (fn [] (make-synth s/freeverb))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
+;; (defn freeverb [e]
+;;   (let [id (get-id "freeverb" e)
+;;         f (fn [] (make-synth s/freeverb))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/freeverb )))
 
-(defn echo [e]
-  (let [id (get-id "echo" e)
-        f (fn [] (make-synth s/echo))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/echo) ))
+;; (defn echo [e]
+;;   (let [id (get-id "echo" e)
+;;         f (fn [] (make-synth s/echo))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/echo) ))
 
-(defn amp [e]
-  (let [id (get-id "amp" e)
-        f (fn [] (make-synth s/amp))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
+;; (defn amp [e]
+;;   (let [id (get-id "amp" e)
+;;         f (fn [] (make-synth s/amp))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/amp) ))
 
-(defn adsr-env [e]
-  (let [id (get-id "adsr-env" e)
-        f (fn [] (make-synth s/adsr-env))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/adsr-env) ))
+;; (defn adsr-env [e]
+;;   (let [id (get-id "adsr-env" e)
+;;         f (fn [] (make-synth s/adsr-env))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/adsr-env) ))
 
-(defn perc-env [e]
-  (let [id (get-id "perc-env" e)
-        f (fn [] (make-synth s/perc-env))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/perc-env) ))
+;; (defn perc-env [e]
+;;   (let [id (get-id "perc-env" e)
+;;         f (fn [] (make-synth s/perc-env))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :audio :synth-type s/perc-env) ))
 
-(defn pct-add [e]
-  (let [id (get-id "pct-add" e)
-        f (fn [] (make-synth s/pct-add))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
+;; (defn pct-add [e]
+;;   (let [id (get-id "pct-add" e)
+;;         f (fn [] (make-synth s/pct-add))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/pct-add) ))
 
-(defn mult [e]
-  (let [id (get-id "mult" e)
-        f (fn [] (make-synth s/mult))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/mult) ))
+;; (defn mult [e]
+;;   (let [id (get-id "mult" e)
+;;         f (fn [] (make-synth s/mult))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/mult) ))
 
-(defn val-add [e]
-  (let [id (get-id "val-add" e)
-        f (fn [] (make-synth s/val-add))]
-    (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/val-add) ))
+;; (defn val-add [e]
+;;   (let [id (get-id "val-add" e)
+;;         f (fn [] (make-synth s/val-add))]
+;;     (add-node :name id :play-fn f :input "in" :output "out" :out-type :control :synth-type s/val-add) ))
 
-(defn sin-vco [e]
-  (let [id (get-id "sin-vco" e)
-        f (fn []  (make-synth s/sin-vco))]
-    (add-node :name id :play-fn f :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
+;; (defn sin-vco [e]
+;;   (let [id (get-id "sin-vco" e)
+;;         f (fn []  (make-synth s/sin-vco))]
+;;     (add-node :name id :play-fn f :input "freq" :output "out" :out-type :control :synth-type s/sin-vco)))
 
-(defn rand-in [e]
-  (let [id (get-id "rand-in" e)
-        f (fn []  (make-synth s/rand-in))]
-    (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-in)))
+;; (defn rand-in [e]
+;;   (let [id (get-id "rand-in" e)
+;;         f (fn []  (make-synth s/rand-in))]
+;;     (add-node :name id :play-fn f :output "out" :out-type :control :synth-type s/rand-in)))
 
-(defn rand-pent [e]
-  (let [id (get-id "rand-pent" e)
-        f (fn []  (make-synth s/rand-pent))]
-    (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
+;; (defn rand-pent [e]
+;;   (let [id (get-id "rand-pent" e)
+;;         f (fn []  (make-synth s/rand-pent))]
+;;     (add-node :name id :play-fn f :input "val" :output "out" :out-type :control :synth-type s/rand-pent)))
 
-(defn note-freq [e]
-  (let [id (get-id "note-freq" e)
-        f (fn []  (make-synth s/note-freq))]
-    (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/note-freq)))
+;; (defn note-freq [e]
+;;   (let [id (get-id "note-freq" e)
+;;         f (fn []  (make-synth s/note-freq))]
+;;     (add-node :name id :play-fn f :output "freq" :out-type :control :synth-type s/note-freq)))
 
-(defn audio-out [e]
-  (let [id (get-id "audio-out" e)
-        f (fn []  (make-synth s/audio-out))]
-    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-out)))
+;; (defn audio-out [e]
+;;   (let [id (get-id "audio-out" e)
+;;         f (fn []  (make-synth s/audio-out))]
+;;     (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-out)))
 
-(defn audio-in [e]
-  (let [id (get-id "audio-in" e)
-        f (fn []  (make-synth s/audio-in))]
-    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-in)))
+;; (defn audio-in [e]
+;;   (let [id (get-id "audio-in" e)
+;;         f (fn []  (make-synth s/audio-in))]
+;;     (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/audio-in)))
 
-(defn c-splitter [e]
-  (let [id (get-id "c-splitter" e)
-        f (fn []  (make-synth s/c-splitter))]
-    (add-node :name id :play-fn f :output :split :out-type :control :synth-type s/c-splitter)))
+;; (defn c-splitter [e]
+;;   (let [id (get-id "c-splitter" e)
+;;         f (fn []  (make-synth s/c-splitter))]
+;;     (add-node :name id :play-fn f :output :split :out-type :control :synth-type s/c-splitter)))
 
-(defn a-splitter [e]
-  (let [id (get-id "a-splitter" e)
-        f (fn [] (make-synth s/a-splitter))]
-    (add-node :name id :play-fn f :output :split :out-type :audio :synth-type s/a-splitter)))
+;; (defn a-splitter [e]
+;;   (let [id (get-id "a-splitter" e)
+;;         f (fn [] (make-synth s/a-splitter))]
+;;     (add-node :name id :play-fn f :output :split :out-type :audio :synth-type s/a-splitter)))
 
-(defn a-mixer-2 [e]
-  (let [id (get-id "a-mixer-2" e)
-        f (fn [] (make-synth s/a-mixer-2))]
-    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-2)))
+;; (defn a-mixer-2 [e]
+;;   (let [id (get-id "a-mixer-2" e)
+;;         f (fn [] (make-synth s/a-mixer-2))]
+;;     (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-2)))
 
-(defn a-mixer-4 [e]
-  (let [id (get-id "a-mixer-4" e)
-        f (fn [] (make-synth s/a-mixer-4))]
-    (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-4)))
+;; (defn a-mixer-4 [e]
+;;   (let [id (get-id "a-mixer-4" e)
+;;         f (fn [] (make-synth s/a-mixer-4))]
+;;     (add-node :name id :play-fn f :output "out" :out-type :audio :synth-type s/a-mixer-4)))
 
-(defn const [e]
-  (let [id (get-id "const" e)
-        t (text :text "     " :columns 5 :id (str id "-text"))
-        f (fn [] (let [synth (s/const)
-                      v (text t)
-                      unregister (do (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))
-                                     ;;(listen t :mouse-down (fn [e] (let [v (read-string (text t))])))
-                                     )]
-                  (if (not (empty? (str/trim v)))
-                    (s/sctl synth :ibus (read-string v)))
-                  {:synth synth :stop-fn unregister}))]
-    (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
-              :cent t)))
+;; (defn const [e]
+;;   (let [id (get-id "const" e)
+;;         t (text :text "     " :columns 5 :id (str id "-text"))
+;;         f (fn [] (let [synth (s/const)
+;;                       v (text t)
+;;                       unregister (do (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))
+;;                                      ;;(listen t :mouse-down (fn [e] (let [v (read-string (text t))])))
+;;                                      )]
+;;                   (if (not (empty? (str/trim v)))
+;;                     (s/sctl synth :ibus (read-string v)))
+;;                   {:synth synth :stop-fn unregister}))]
+;;     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const
+;;               :cent t)))
 
-(defn slider-ctl [e]
-  (let [id (get-id "slider-ctl" e)
-        s (slider :value 0 :min 0 :max 100 :orientation :vertical)
-        f (fn [] (let [synth (s/const)
-                      unregister (listen s :change (fn [e] (s/sctl synth :ibus (int (value s)))))]
-                  (s/sctl synth :ibus (int (value s)))
-                  {:synth synth :stop-fn unregister}))]
-    (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const :cent s)))
+;; (defn slider-ctl [e]
+;;   (let [id (get-id "slider-ctl" e)
+;;         s (slider :value 0 :min 0 :max 100 :orientation :vertical)
+;;         f (fn [] (let [synth (s/const)
+;;                       unregister (listen s :change (fn [e] (s/sctl synth :ibus (int (value s)))))]
+;;                   (s/sctl synth :ibus (int (value s)))
+;;                   {:synth synth :stop-fn unregister}))]
+;;     (add-node :name id :play-fn f :output "val" :out-type :control :synth-type s/const :cent s)))
 
-(defn doc-node
-  ([e] (doc-node e 8))
-  ([e rows]
-     (let [id (get-id "doc-node" e)
-           t (scrollable (text :multi-line? true :editable? true :wrap-lines? true :columns 20 :rows (+ 2 rows) :id (str id "-text")))]
-       (add-node :name id :cent t))))
+;; (defn doc-node
+;;   ([e] (doc-node e 8))
+;;   ([e rows]
+;;      (let [id (get-id "doc-node" e)
+;;            t (scrollable (text :multi-line? true :editable? true :wrap-lines? true :columns 20 :rows (+ 2 rows) :id (str id "-text")))]
+;;        (add-node :name id :cent t))))
 
 (defn play-note [synth n]
   (s/sctl synth :note n)
@@ -425,98 +287,98 @@ Connections are references to two connection points
   (doseq [gated-synth @gated-synths]
     (s/sctl gated-synth :gate 0)))
 
-(defn midi-in2 [e]
-  (let [id (get-id "midi-in2" e)
-        t (text :text "" :columns 1)
-        f (fn [] (let [synth (s/midi-in)
-                      unregister (listen t :key-pressed (fn [e]
-                                           (let [n (min 127 (.getKeyCode e))]
-                                             (println n)
-                                             (play-note synth n))))]
-                  {:synth synth :stop-fn unregister}))]
-    (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
+;; (defn midi-in2 [e]
+;;   (let [id (get-id "midi-in2" e)
+;;         t (text :text "" :columns 1)
+;;         f (fn [] (let [synth (s/midi-in)
+;;                       unregister (listen t :key-pressed (fn [e]
+;;                                            (let [n (min 127 (.getKeyCode e))]
+;;                                              (println n)
+;;                                              (play-note synth n))))]
+;;                   {:synth synth :stop-fn unregister}))]
+;;     (add-node :name id :output "freq" :out-type :control :cent t :play-fn f)))
 
-(defn midi-in [e]
-  (let [id (get-id "midi-in" e)
-        f (fn [] (let [synth (s/midi-in)]
-                  (do
-                    (m/register-note-events synth)
-                    {:synth synth})))]
-    (add-node :name id :output "freq" :out-type :control :play-fn f)))
+;; (defn midi-in [e]
+;;   (let [id (get-id "midi-in" e)
+;;         f (fn [] (let [synth (s/midi-in)]
+;;                   (do
+;;                     (m/register-note-events synth)
+;;                     {:synth synth})))]
+;;     (add-node :name id :output "freq" :out-type :control :play-fn f)))
 
-(defn cc-cont-in [e]
-  (let [id (get-id "cc-cont-in" e)
-        t (text :text "  " :columns 2 :id (str id "-text"))
-        f (fn [] (let [synth (s/cc-in)
-                      v (text t)
-                      unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
-                  (do
-                    (if (not (empty? (str/trim v)))
-                      (m/register-continuous-cc-events synth (read-string v)))
-                    {:synth synth :stop-fn unregister})))]
-    (add-node :name id :output "val" :out-type :control :play-fn f :cent t)))
+;; (defn cc-cont-in [e]
+;;   (let [id (get-id "cc-cont-in" e)
+;;         t (text :text "  " :columns 2 :id (str id "-text"))
+;;         f (fn [] (let [synth (s/cc-in)
+;;                       v (text t)
+;;                       unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
+;;                   (do
+;;                     (if (not (empty? (str/trim v)))
+;;                       (m/register-continuous-cc-events synth (read-string v)))
+;;                     {:synth synth :stop-fn unregister})))]
+;;     (add-node :name id :output "val" :out-type :control :play-fn f :cent t)))
 
-(defn disc-panel [id]
-  (let  [t (text :text "  " :columns 4 :id (str id "-text"))
-         l (label :text "0")
-         p (border-panel :center t :south l)]
-    [t l p]))
+;; (defn disc-panel [id]
+;;   (let  [t (text :text "  " :columns 4 :id (str id "-text"))
+;;          l (label :text "0")
+;;          p (border-panel :center t :south l)]
+;;     [t l p]))
 
-(defn cc-disc-in [e]
-  (let [id (get-id "cc-disc-in" e)
-        [t l p] (disc-panel id)
-        wf (fn [v] (config! l :text (str v)))
-        rf (fn [] (int (read-string (config l :text))))
-        f (fn [] (let [synth (s/cc-in)
-                      v (text t)
-                      unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
-                  (do
-                    (if (not (empty? (str/trim v)))
-                      (m/register-discreet-cc-events synth (read-string v) wf rf))
-                    {:synth synth :stop-fn unregister})))]
-    (add-node :name id :output "val" :out-type :control :play-fn f :cent p)))
+;; (defn cc-disc-in [e]
+;;   (let [id (get-id "cc-disc-in" e)
+;;         [t l p] (disc-panel id)
+;;         wf (fn [v] (config! l :text (str v)))
+;;         rf (fn [] (int (read-string (config l :text))))
+;;         f (fn [] (let [synth (s/cc-in)
+;;                       v (text t)
+;;                       unregister (listen t :action (fn [e] (s/sctl synth :ibus (read-string (text t)))))]
+;;                   (do
+;;                     (if (not (empty? (str/trim v)))
+;;                       (m/register-discreet-cc-events synth (read-string v) wf rf))
+;;                     {:synth synth :stop-fn unregister})))]
+;;     (add-node :name id :output "val" :out-type :control :play-fn f :cent p)))
 
 
-(defn piano-in [e]
-  (let [id (get-id "piano-in" e)
-        f (fn []  (let [synth (s/midi-in)
-                       p (piano (fn [k] (play-note synth k))
-                                (fn [k] (shut-gates)))]
-                   (show! p)
-                   {:synth synth}))]
-    (add-node :name id :play-fn f :output "freq" :out-type :control)))
+;; (defn piano-in [e]
+;;   (let [id (get-id "piano-in" e)
+;;         f (fn []  (let [synth (s/midi-in)
+;;                        p (piano (fn [k] (play-note synth k))
+;;                                 (fn [k] (shut-gates)))]
+;;                    (show! p)
+;;                    {:synth synth}))]
+;;     (add-node :name id :play-fn f :output "freq" :out-type :control)))
 
 
 
 (defn to-string [e]
   (write e :stream nil :pretty false))
 
-(defn get-value-field
-  [w kw]
-  (let [nkw (keyword (str "#" (name kw) "-text"))]
-    (if-let [cw (select w [nkw])]
-      (if (nil? cw) nil cw))))
+;; (defn get-value-field
+;;   [w kw]
+;;   (let [nkw (keyword (str "#" (name kw) "-text"))]
+;;     (if-let [cw (select w [nkw])]
+;;       (if (nil? cw) nil cw))))
 
-(defn get-if-value
-  [w kw]
-  (if-let [vw (get-value-field w kw)]
-    (let [t (config vw :text)]
-      (if (.startsWith (get-node-name kw) "doc")
-        t
-        (read-string t)))
-    nil))
+;; (defn get-if-value
+;;   [w kw]
+;;   (if-let [vw (get-value-field w kw)]
+;;     (let [t (config vw :text)]
+;;       (if (.startsWith (get-node-name kw) "doc")
+;;         t
+;;         (read-string t)))
+;;     nil))
 
-(defn dump-nodes []
-  (map (fn [e]
-         (let [w (:widget e)
-               l (config w :location)
-               kw (config w :id)
-               rv {:x (.getX l) :y (.getY l) :w kw}
-               v (if-let [vw (get-if-value w kw)]
-                   (assoc rv :v vw)
-                   rv)]
-           v))
-       (vals @nodes)))
+;; (defn dump-nodes []
+;;   (map (fn [e]
+;;          (let [w (:widget e)
+;;                l (config w :location)
+;;                kw (config w :id)
+;;                rv {:x (.getX l) :y (.getY l) :w kw}
+;;                v (if-let [vw (get-if-value w kw)]
+;;                    (assoc rv :v vw)
+;;                    rv)]
+;;            v))
+;;        (vals @nodes)))
 
 (defn dump-synth [s]
   (symbol (second (first s))))
@@ -524,17 +386,17 @@ Connections are references to two connection points
 (defn dump-connections []
   @connections)
 
-(defn get-frame-dimension [f]
-  (let [d (.getSize f)
-        h (.getHeight d)
-        w (.getWidth d)]
-    {:height h :width w}))
+;; (defn get-frame-dimension [f]
+;;   (let [d (.getSize f)
+;;         h (.getHeight d)
+;;         w (.getWidth d)]
+;;     {:height h :width w}))
 
-(defn dump-all []
-  {:nodes (symbol (str "'" (to-string (dump-nodes))))
-   :connections (symbol (str "'" (to-string (dump-connections))))
-   :master-vol (:master-vol @s-panel)
-   :frame (get-frame-dimension (:frame @s-panel))})
+;; (defn dump-all []
+;;   {:nodes (symbol (str "'" (to-string (dump-nodes))))
+;;    :connections (symbol (str "'" (to-string (dump-connections))))
+;;    :master-vol (:master-vol @s-panel)
+;;    :frame (get-frame-dimension (:frame @s-panel))})
 
 (defn make-node [ntype id x y v]
   (let [rc (if (= ntype "doc-node") (count (filter #(= \newline %) v)))
@@ -685,13 +547,6 @@ Connections are references to two connection points
   (reset! next-id 0)
   (reset! s-panel {}))
 
-(defn make-panel []
-  (xyz-panel
-    :paint draw-grid
-    :id :xyz
-    :background "#222222"
-    :items []
-    ))
 
 (declare ms-new
          ms-load-file
@@ -700,81 +555,81 @@ Connections are references to two connection points
          ms-load-example
          monitor-all-busses)
 
-(defn fr []
-  (let [p (make-panel)]
-    (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
-    (frame
-     :menubar (menubar :items [(menu :text "File"
-                                     :items [(action :handler ms-new :name "New")
-                                             (action :handler ms-load-file :name "Load File")
-                                             (action :handler ms-load-example :name "Load Example")
-                                             (action :handler ms-save-file :name "Save File")
-                                             (action :handler ms-save-file-as :name "Save File As")
-                                             (action :handler dispose! :name "Exit")])
-                               (menu :text "Control"
-                                     :items [(action :handler monitor-all-busses :name "Buss Monitor")
-                                             (action :handler sound-on :name "Sound On")
-                                             (action :handler sound-off :name "Sound Off")])
-                               (menu :text "Modules"
-                                     :items [(menu :text "Input/Output"
-                                                   :items [(action :handler midi-in :name "Midi In")
-                                                           (action :handler midi-in2 :name "Midi In 2")
-                                                           (action :handler cc-cont-in :name "CC Continuous")
-                                                           (action :handler cc-disc-in :name "CC Discreet")
-                                                           (action :handler note-freq :name "Note Freq")
-                                                           (action :handler piano-in :name "Piano In")
-                                                           (action :handler audio-out :name "Audio Out")
-                                                           ])
-                                             (menu :text "Oscillators"
-                                                   :items [(action :handler saw-osc :name "Saw Osc")
-                                                           (action :handler square-osc :name "Square Osc")
-                                                           (action :handler sin-osc :name "Sin Osc")
-                                                           (action :handler sin-vco :name "Sin VCO")
-                                                           ])
-                                             (menu :text "Filters"
-                                                   :items [(action :handler lp-filt :name "LP Filt")
-                                                           (action :handler hp-filt :name "HP Filt")
-                                                           (action :handler bp-filt :name "BP Filt")
-                                                           (action :handler moog-filt :name "Moog Filt")
-                                                           ])
-                                             (menu :text "Effects"
-                                                   :items [(action :handler freeverb :name "Freeverb")
-                                                           (action :handler echo :name "Echo")
-                                                           (action :handler amp :name "Amp")
-                                                           (action :handler adsr-env :name "ADSR-Env")
-                                                           (action :handler perc-env :name "Perc-Env")
-                                                           ])
-                                             (menu :text "Mixing"
-                                                   :items [(action :handler a-splitter :name "Audio Splitter")
-                                                           (action :handler a-mixer-2 :name "2 Ch mixer")
-                                                           (action :handler a-mixer-4 :name "4 Ch mixer")
-                                                           ])
-                                             (menu :text "Control"
-                                                   :items [(action :handler pct-add :name "Pct Add")
-                                                           (action :handler val-add :name "Val Add")
-                                                           (action :handler mult :name "Multiply")
-                                                           (action :handler slider-ctl :name "Slider")
-                                                           (action :handler c-splitter :name "Control Splitter")                                                           ])
-                                             ;; (menu :text "Miscellaneous"
-                                             ;;       :items [(action :handler rand-in :name "Random Val")
-                                             ;;               (action :handler rand-pent :name "Random Pentatonic")
-                                             ;;               (action :handler const :name "Const")
-                                             ;;               (action :handler doc-node :name "Doc Node")])
-                                             ])])
-     :title   "Overtone Modular Synth"
-     :content (border-panel
-               :vgap 5
-               :center p)
-     :size    [600 :by 600])))
+;; (defn fr []
+;;   (let [p (make-panel)]
+;;     (swap! s-panel assoc :panel p :last-point nil :master-vol 0.3)
+;;     (frame
+;;      :menubar (menubar :items [(menu :text "File"
+;;                                      :items [(action :handler ms-new :name "New")
+;;                                              (action :handler ms-load-file :name "Load File")
+;;                                              (action :handler ms-load-example :name "Load Example")
+;;                                              (action :handler ms-save-file :name "Save File")
+;;                                              (action :handler ms-save-file-as :name "Save File As")
+;;                                              (action :handler dispose! :name "Exit")])
+;;                                (menu :text "Control"
+;;                                      :items [(action :handler monitor-all-busses :name "Buss Monitor")
+;;                                              (action :handler sound-on :name "Sound On")
+;;                                              (action :handler sound-off :name "Sound Off")])
+;;                                (menu :text "Modules"
+;;                                      :items [(menu :text "Input/Output"
+;;                                                    :items [(action :handler midi-in :name "Midi In")
+;;                                                            (action :handler midi-in2 :name "Midi In 2")
+;;                                                            (action :handler cc-cont-in :name "CC Continuous")
+;;                                                            (action :handler cc-disc-in :name "CC Discreet")
+;;                                                            (action :handler note-freq :name "Note Freq")
+;;                                                            (action :handler piano-in :name "Piano In")
+;;                                                            (action :handler audio-out :name "Audio Out")
+;;                                                            ])
+;;                                              (menu :text "Oscillators"
+;;                                                    :items [(action :handler saw-osc :name "Saw Osc")
+;;                                                            (action :handler square-osc :name "Square Osc")
+;;                                                            (action :handler sin-osc :name "Sin Osc")
+;;                                                            (action :handler sin-vco :name "Sin VCO")
+;;                                                            ])
+;;                                              (menu :text "Filters"
+;;                                                    :items [(action :handler lp-filt :name "LP Filt")
+;;                                                            (action :handler hp-filt :name "HP Filt")
+;;                                                            (action :handler bp-filt :name "BP Filt")
+;;                                                            (action :handler moog-filt :name "Moog Filt")
+;;                                                            ])
+;;                                              (menu :text "Effects"
+;;                                                    :items [(action :handler freeverb :name "Freeverb")
+;;                                                            (action :handler echo :name "Echo")
+;;                                                            (action :handler amp :name "Amp")
+;;                                                            (action :handler adsr-env :name "ADSR-Env")
+;;                                                            (action :handler perc-env :name "Perc-Env")
+;;                                                            ])
+;;                                              (menu :text "Mixing"
+;;                                                    :items [(action :handler a-splitter :name "Audio Splitter")
+;;                                                            (action :handler a-mixer-2 :name "2 Ch mixer")
+;;                                                            (action :handler a-mixer-4 :name "4 Ch mixer")
+;;                                                            ])
+;;                                              (menu :text "Control"
+;;                                                    :items [(action :handler pct-add :name "Pct Add")
+;;                                                            (action :handler val-add :name "Val Add")
+;;                                                            (action :handler mult :name "Multiply")
+;;                                                            (action :handler slider-ctl :name "Slider")
+;;                                                            (action :handler c-splitter :name "Control Splitter")                                                           ])
+;;                                              ;; (menu :text "Miscellaneous"
+;;                                              ;;       :items [(action :handler rand-in :name "Random Val")
+;;                                              ;;               (action :handler rand-pent :name "Random Pentatonic")
+;;                                              ;;               (action :handler const :name "Const")
+;;                                              ;;               (action :handler doc-node :name "Doc Node")])
+;;                                              ])])
+;;      :title   "Overtone Modular Synth"
+;;      :content (border-panel
+;;                :vgap 5
+;;                :center p)
+;;      :size    [600 :by 600])))
 
-(defn bugger-what!
-  "for some reason, makes the frame show full size, sometimes
-   swing has a high astonishment factor
-  "
-  [f]
-  (if (= (java.awt.Dimension.) (.getSize f))
-    (pack! f)
-    f))
+;; (defn bugger-what!
+;;   "for some reason, makes the frame show full size, sometimes
+;;    swing has a high astonishment factor
+;;   "
+;;   [f]
+;;   (if (= (java.awt.Dimension.) (.getSize f))
+;;     (pack! f)
+;;     f))
 
 (defn get-buss-order [c]
   (let [o (get-order c)
@@ -784,35 +639,35 @@ Connections are references to two connection points
           :when v]
       (let [[[f t]] v] (str (name f) " -> " (name t))))))
 
-(defn monitor-all-busses [e]
-  (future
-    (let [bm (all-bus-monitors)
-          v (fn [bm]
-              (let [bo (map (fn [e] [e (get bm e)]) (get-buss-order @connections))]
-                (for [[k b] bo] {:name k :val (deref b)})))
-          c [:name :val]
-          t (table :model [:columns c :rows (v bm)])
-          f (frame :title "Buss Monitor"
-                   :content (border-panel :center t))]
-      (-> f bugger-what! show!)
-      (loop []
-        (Thread/sleep 200)
-        (let [bm1 (all-bus-monitors)
-              model (table-model :columns c :rows (v bm1))]
-          (config! t :model model))
-        (recur)))))
+;; (defn monitor-all-busses [e]
+;;   (future
+;;     (let [bm (all-bus-monitors)
+;;           v (fn [bm]
+;;               (let [bo (map (fn [e] [e (get bm e)]) (get-buss-order @connections))]
+;;                 (for [[k b] bo] {:name k :val (deref b)})))
+;;           c [:name :val]
+;;           t (table :model [:columns c :rows (v bm)])
+;;           f (frame :title "Buss Monitor"
+;;                    :content (border-panel :center t))]
+;;       (-> f bugger-what! show!)
+;;       (loop []
+;;         (Thread/sleep 200)
+;;         (let [bm1 (all-bus-monitors)
+;;               model (table-model :columns c :rows (v bm1))]
+;;           (config! t :model model))
+;;         (recur)))))
 
 
-(defn -main [& args]
-  (ms-reset!)
-  (let [f (invoke-now (fr))]
-    (swap! s-panel assoc :frame f :run-mode false :changes-pending false)
-    (config! f :on-close :dispose)
-    (-> f bugger-what! show!)))
+;; (defn -main [& args]
+;;   (ms-reset!)
+;;   (let [f (invoke-now (fr))]
+;;     (swap! s-panel assoc :frame f :run-mode false :changes-pending false)
+;;     (config! f :on-close :dispose)
+;;     (-> f bugger-what! show!)))
 
-(defn set-frame-size [f d]
-  (when d
-    (.setSize f (java.awt.Dimension. (:width d) (:height d)))))
+;; (defn set-frame-size [f d]
+;;   (when d
+;;     (.setSize f (java.awt.Dimension. (:width d) (:height d)))))
 
 (defn restore
   "usage: (restore (load-file fff.clj))
@@ -847,13 +702,13 @@ Connections are references to two connection points
     (doseq [n (filter #(.startsWith (get-node-name (:w %)) "doc") (:nodes r))]
       (r-make-node n))
     (build-synths-and-connections (distinct oc) c true)
-    (set-frame-size f (:frame r)))
+    ;; (set-frame-size f (:frame r)))
   (swap! s-panel assoc :last-point  nil :changes-pending false))
 
-(defn ms-new
-  [e]
-  (hide! (:frame @s-panel))
-  (-main))
+;; (defn ms-new
+;;   [e]
+;;   (hide! (:frame @s-panel))
+;;   (-main))
 
 (defn ms-load-example [e]
   (ms-load-file e "./examples"))
@@ -868,7 +723,7 @@ Connections are references to two connection points
                                        :dir dir
                                        :filters [["Mod Synths" ["oms"]]]
                                        :success-fn (fn [fc file] (.getAbsolutePath file)))]
-                 (hide! (:frame @s-panel))
+                 ;; (hide! (:frame @s-panel))
                  (restore (load-file file)))))))
 
 (defn ms-save-file

@@ -1,5 +1,5 @@
 (ns modsynth.t1
-  (:use overtone.live)  ; to work on gui without overtone comment out this line
+  (:use overtone.core)  ; to work on gui without overtone comment out this line
   )
 
 (def OB 2)

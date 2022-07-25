@@ -1,5 +1,5 @@
 (ns modsynth.synths
-  (:use overtone.live)  ; to work on gui without overtone comment out this line
+  (:use overtone.core)  ; to work on gui without overtone comment out this line
   )
 
 ;;(defmacro mod-defsynth [name p body] (let [sym-name (symbol (eval name))] `(o/defsynth ~sym-name ~p ~body)))
@@ -27,7 +27,7 @@
   [obus 0
    b1 OB1
    b2 OB2]
-  (out obus [(in:ar b1 1) (in:ar b2 1) ]))
+  (out obus [(in:ar b1 0.5) (in:ar b2 0.5) ]))
 
 (defsynth audio-in
   [obus OB
